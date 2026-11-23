@@ -15,7 +15,7 @@ function harness({ fail, cleanupFail = false, identity = uuid, exitCode = 23 } =
     let childEnv;
     const execute = vi.fn((file, args, env) => {
         childEnv = env;
-        const operation = file === "docker" ? args[7] : args[0].split(/[\\/]/).at(-1);
+        const operation = file === "docker" ? args[7] : args.find((arg) => !arg.startsWith("--")).split(/[\\/]/).at(-1);
         events.push(operation);
         if (operation === fail || (operation === "down" && cleanupFail)) {
             const error = new Error(`Failed ${operation}`);
@@ -68,6 +68,17 @@ describe("disposable MySQL safety", () => {
         expect(h.capturedEnvironment().DATABASE_URL).not.toContain("production");
         expect(h.execute.mock.calls.find(([, args]) => args.includes("deploy"))).toBeDefined();
         expect(h.end).toHaveBeenCalledOnce();
+    });
+    it("runs the Routine profile after verified identity and migrations and cleans up on failure", async () => {
+        const h = harness({ fail: "profile-routine-work-items.mjs" });
+        await expect(runIntegration({ env: { DATABASE_URL: "mysql://production/db" }, ...h, profileRoutine: true })).rejects.toMatchObject({ exitCode: 23 });
+        expect(h.events).toEqual(["up", "port", "exec", "index.js", "index.js", "profile-routine-work-items.mjs", "down", "ps"]);
+        expect(h.execute.mock.calls.find(([, args]) => args.includes("deploy"))).toBeDefined();
+        expect(validateDisposableTarget(h.capturedEnvironment()).hostname).toBe("127.0.0.1");
+
+        const unsafe = harness({ identity: "wrong" });
+        await expect(runIntegration({ env: {}, ...unsafe, profileRoutine: true })).rejects.toThrow("identity mismatch");
+        expect(unsafe.events).toEqual(["up", "port", "exec", "down", "ps"]);
     });
     it.each(["up", "index.js", "test-routine-reminder-recipient-contract.mjs", "vitest.mjs"])("cleans after %s failure and preserves exit code", async (fail) => {
         const h = harness({ fail });
