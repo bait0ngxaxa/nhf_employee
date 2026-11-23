@@ -73,7 +73,7 @@ export function projectName(env) {
 }
 
 // Injectable process/database boundaries permit safety tests without Docker.
-export async function runIntegration({ env = process.env, execute = command, connect = createConnection, probe = false, cleanupOnly = false, profileRoutine = false } = {}) {
+export async function runIntegration({ env = process.env, execute = command, connect = createConnection, probe = false, cleanupOnly = false, profileRoutine = false, profileScheduler = false } = {}) {
     if (!cleanupOnly && env.TEST_DATABASE_URL) {
         throw new Error("External TEST_DATABASE_URL is not accepted; this runner owns a disposable Compose database");
     }
@@ -120,12 +120,14 @@ export async function runIntegration({ env = process.env, execute = command, con
             write(`${label} สำเร็จ`);
         };
         run("Generate Prisma Client", require.resolve("prisma/build/index.js"), ["generate"]);
-        if (!profileRoutine) {
+        if (!profileRoutine && !profileScheduler) {
             run("Routine recipient migration SQL coverage", resolve(root, "scripts/test-routine-reminder-recipient-contract.mjs"), []);
         }
         run("ใช้ Prisma migrations", require.resolve("prisma/build/index.js"), ["migrate", "deploy"]);
         if (profileRoutine) {
             run("Profile Routine work items", resolve(root, "scripts/profile-routine-work-items.mjs"), [], ["--expose-gc"]);
+        } else if (profileScheduler) {
+            run("Profile Routine scheduler", resolve(root, "scripts/profile-routine-scheduler.mjs"), []);
         } else {
             run("รัน Vitest", resolve(dirname(require.resolve("vitest/package.json")), "vitest.mjs"), ["run", "--config", "vitest.integration.config.ts"]);
         }
@@ -148,14 +150,18 @@ export async function runIntegration({ env = process.env, execute = command, con
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     try {
         const mode = process.argv.slice(2);
-        if (mode.length > 1 || (mode.length && !["--cleanup", "--verify-failure-cleanup", "--profile-routine"].includes(mode[0]))) {
+        if (mode.length > 1 || (mode.length && !["--cleanup", "--verify-failure-cleanup", "--profile-routine", "--profile-scheduler"].includes(mode[0]))) {
             throw new Error("Unsupported integration runner arguments");
         }
         if (mode[0] === "--cleanup") {
             if (process.env.GITHUB_ACTIONS !== "true") throw new Error("Standalone cleanup requires GitHub run identity; local runs clean up in finally");
             for (const probe of [false, true]) await runIntegration({ cleanupOnly: true, probe });
         } else {
-            await runIntegration({ probe: mode[0] === "--verify-failure-cleanup", profileRoutine: mode[0] === "--profile-routine" });
+            await runIntegration({
+                probe: mode[0] === "--verify-failure-cleanup",
+                profileRoutine: mode[0] === "--profile-routine",
+                profileScheduler: mode[0] === "--profile-scheduler",
+            });
         }
     } catch (error) {
         console.error(`[integration] ${error.message}`);
