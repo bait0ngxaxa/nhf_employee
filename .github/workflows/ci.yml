@@ -22,8 +22,9 @@ jobs:
         run: |
           set -euo pipefail
           git show f913204e57d576d74c06e252f76e4cb19bcd3165:modules/routine/application/generation.ts > modules/routine/application/generation.ts
+          git show f913204e57d576d74c06e252f76e4cb19bcd3165:modules/routine/domain/schedule.ts > modules/routine/domain/schedule.ts
           node scripts/run-mysql-integration-tests.mjs --profile-scheduler | tee /tmp/routine-scheduler-baseline.log
-          git restore -- modules/routine/application/generation.ts
+          git restore -- modules/routine/application/generation.ts modules/routine/domain/schedule.ts
           node scripts/run-mysql-integration-tests.mjs --profile-scheduler | tee /tmp/routine-scheduler-candidate.log
           node scripts/compare-routine-scheduler-profiles.mjs /tmp/routine-scheduler-{baseline,candidate}.log |
             sed 's/^/SCHEDULER_COMPARISON /'
