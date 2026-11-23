@@ -69,6 +69,8 @@ Fixture มี 0–2,500 active MANUAL Tasks, 10 Occurrences ต่อ Task, ช
 
 ## Routine Scheduler baseline
 
+ผล optimization ที่วัดซ้ำถึง 1,000 Tasks พร้อม differential verification และขั้นตอนรันซ้ำอยู่ใน [Routine Scheduler performance](routine-scheduler.md).
+
 ใช้ `runRoutineScheduler` ของ baseline บน MySQL 8.0.46, Node 24.22.1, Prisma 6.19.3, Intel Xeon 6975P-C 4 logical CPUs / RAM 15.33 GiB. Fixture มี 25 แล้วเพิ่มเป็น 250 active monthly Tasks, มี owner และ `IN_APP` due reminder หนึ่ง rule ต่อ Task, fixed clock เวลา 10:00 กรุงเทพฯ ของ 7 พ.ย. 2026. วัด first-run 1 ครั้ง, steady state 2 warm-ups และ 20 serial samples ต่อขนาด, และทดลอง 5 คู่ที่มี 2 schedulers เริ่มพร้อมกันใน steady state ขนาด 25 Tasks [สคริปต์และ workflow สำหรับรันซ้ำ](https://github.com/bait0ngxaxa/nhf_employee/tree/af3f11d1/scripts) [Hosted run และ cleanup](https://github.com/bait0ngxaxa/nhf_employee/actions/runs/45100422587) [Samples และ counters](routine-scheduler-baseline.jsonl)
 
 | Operation | Tasks | p50 (ms) | p95 (ms) | SELECTs | BEGIN/COMMIT | ผลลัพธ์ |
