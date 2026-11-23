@@ -83,16 +83,14 @@ async function readInventorySnapshot(tx: Prisma.TransactionClient, materials: An
     const invalid = await tx.stockRequestItem.findFirst({ where: { variantId: null, request: { status: StockRequestStatus.PENDING_ISSUE } }, select: { id: true } });
     if (invalid) throw new StockInvariantViolationError("พบคำขอรอจ่ายที่ไม่มี variant snapshot");
     const health = { healthy: 0, low: 0, out: 0 };
-    const alerts: AnalyticsVariant[] = [];
+    const alerts: Omit<AnalyticsVariant, "name" | "attributes">[] = [];
     const materialById = new Map(materials.map((m) => [m.id, m]));
     let cursor = 0;
     for (;;) {
         const variants = await tx.stockItemVariant.findMany({
             where: { id: { gt: cursor }, isActive: true, stockItem: { isActive: true } },
             take: 500, orderBy: { id: "asc" },
-            select: { id: true, stockItemId: true, sku: true, unit: true, quantity: true, minStock: true,
-                stockItem: { select: { name: true } },
-                attributeValues: { select: { attributeValue: { select: { value: true, attribute: { select: { name: true } } } } } } },
+            select: { id: true, stockItemId: true, sku: true, unit: true, quantity: true, minStock: true },
         });
         if (!variants.length) break;
         const reservations = await tx.stockRequestItem.groupBy({ by: ["variantId"], where: { variantId: { in: variants.map((v) => v.id) }, request: { status: StockRequestStatus.PENDING_ISSUE } }, _sum: { quantity: true } });
@@ -109,8 +107,7 @@ async function readInventorySnapshot(tx: Prisma.TransactionClient, materials: An
                 else material.available.push({ unit: v.unit, quantity: available });
             }
             if (status !== "healthy") {
-                alerts.push({ id: v.id, itemId: v.stockItemId, name: v.stockItem.name, sku: v.sku,
-                    attributes: v.attributeValues.map((a) => `${a.attributeValue.attribute.name}: ${a.attributeValue.value}`).sort().join(", "),
+                alerts.push({ id: v.id, itemId: v.stockItemId, sku: v.sku,
                     unit: v.unit, quantity: v.quantity, reserved: reserved.get(v.id) ?? 0, available, minimum: v.minStock, status });
                 alerts.sort((a, b) => Number(b.status === "out") - Number(a.status === "out") || a.id - b.id);
                 if (alerts.length > 20) alerts.pop();
@@ -118,7 +115,29 @@ async function readInventorySnapshot(tx: Prisma.TransactionClient, materials: An
         }
         cursor = variants[variants.length - 1].id;
     }
-    return { health, alerts };
+    if (alerts.length === 0) return { health, alerts: [] };
+
+    // Hydrate only the final ranked alerts using the same inventory snapshot.
+    const variants = await tx.stockItemVariant.findMany({
+        where: { id: { in: alerts.map((alert) => alert.id) } },
+        select: {
+            id: true,
+            stockItem: { select: { name: true } },
+            attributeValues: { select: { attributeValue: { select: { value: true, attribute: { select: { name: true } } } } } },
+        },
+    });
+    const variantsById = new Map(variants.map((variant) => [variant.id, variant]));
+    return {
+        health,
+        alerts: alerts.map((alert) => {
+            const variant = variantsById.get(alert.id);
+            if (!variant) throw new StockInvariantViolationError("ไม่พบ variant ในข้อมูลแจ้งเตือนสินค้าใกล้หมด");
+            const attributes = variant.attributeValues.map((entry) =>
+                `${entry.attributeValue.attribute.name}: ${entry.attributeValue.value}`).sort().join(", ");
+            const { id, itemId, sku, ...stock } = alert;
+            return { id, itemId, name: variant.stockItem.name, sku, attributes, ...stock };
+        }),
+    };
 }
 
 async function readDetail(tx: Prisma.TransactionClient, query: StockAnalyticsQuery, where: Prisma.Sql): Promise<NonNullable<StockAnalyticsResponse["detail"]>> {
