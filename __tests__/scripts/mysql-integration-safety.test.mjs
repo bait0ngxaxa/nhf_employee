@@ -80,15 +80,18 @@ describe("disposable MySQL safety", () => {
         await expect(runIntegration({ env: {}, ...unsafe, profileRoutine: true })).rejects.toThrow("identity mismatch");
         expect(unsafe.events).toEqual(["up", "port", "exec", "down", "ps"]);
     });
-    it("grants scheduler profiling reads only after validating the live disposable database", async () => {
-        const h = harness({ fail: "profile-routine-scheduler.mjs" });
-        await expect(runIntegration({ env: {}, ...h, profileScheduler: true })).rejects.toMatchObject({ exitCode: 23 });
-        expect(h.events).toEqual(["up", "port", "exec", "exec", "index.js", "index.js", "profile-routine-scheduler.mjs", "down", "ps"]);
+    it.each([
+        ["profile-routine-scheduler.mjs", { profileScheduler: true }],
+        ["profile-stock-analytics.mjs", { profileStockAnalytics: true }],
+    ])("validates the live disposable database before granting profiling reads for %s", async (script, mode) => {
+        const h = harness({ fail: script });
+        await expect(runIntegration({ env: {}, ...h, ...mode })).rejects.toMatchObject({ exitCode: 23 });
+        expect(h.events).toEqual(["up", "port", "exec", "exec", "index.js", "index.js", script, "down", "ps"]);
         expect(h.end.mock.invocationCallOrder[0]).toBeLessThan(h.execute.mock.invocationCallOrder[3]);
         expect(h.execute.mock.calls[3][1].at(-1)).toMatch(/^GRANT SELECT ON performance_schema\./);
 
         const unsafe = harness({ identity: "wrong" });
-        await expect(runIntegration({ env: {}, ...unsafe, profileScheduler: true })).rejects.toThrow("identity mismatch");
+        await expect(runIntegration({ env: {}, ...unsafe, ...mode })).rejects.toThrow("identity mismatch");
         expect(unsafe.events).toEqual(["up", "port", "exec", "down", "ps"]);
     });
     it.each(["up", "index.js", "test-routine-reminder-recipient-contract.mjs", "vitest.mjs"])("cleans after %s failure and preserves exit code", async (fail) => {
