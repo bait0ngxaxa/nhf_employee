@@ -11,6 +11,7 @@ export const ROUTINE_TIMING_STATUSES = [
 ] as const;
 
 export type RoutineTimingStatus = (typeof ROUTINE_TIMING_STATUSES)[number];
+export const ROUTINE_DUE_SOON_DAYS = 7;
 
 export function getRoutineTimingStatus(
     today: CalendarDate,
@@ -19,7 +20,7 @@ export function getRoutineTimingStatus(
     const daysUntilDue = calendarDayDifference(today, dueDate);
     if (daysUntilDue < 0) return "OVERDUE";
     if (daysUntilDue === 0) return "DUE_TODAY";
-    if (daysUntilDue <= 7) return "DUE_SOON";
+    if (daysUntilDue <= ROUTINE_DUE_SOON_DAYS) return "DUE_SOON";
     return "UPCOMING";
 }
 
