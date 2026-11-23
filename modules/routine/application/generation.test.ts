@@ -56,6 +56,10 @@ function generatedOccurrence(overrides: Record<string, unknown> = {}): Record<st
     };
 }
 
+function staleFutureOccurrence(): Record<string, unknown> {
+    return generatedOccurrence({ id: 199, periodKey: "obsolete-period" });
+}
+
 describe("NHF Routine occurrence generation", () => {
     beforeEach(() => {
         mockReset(prismaMock);
@@ -76,6 +80,41 @@ describe("NHF Routine occurrence generation", () => {
         prismaMock.routineOccurrenceAssignee.createMany.mockResolvedValue(
             asNever({ count: 0 }),
         );
+    });
+
+    it("does not hydrate occurrence assignees when no template comparison is requested", async () => {
+        await generateRoutineTaskOccurrences(71, new Date("2026-08-04T04:00:00.000Z"));
+
+        expect(prismaMock.routineOccurrence.findMany.mock.calls[0]?.[0]?.select?.assignees)
+            .toBeFalsy();
+        expect(prismaMock.routineOccurrence.findUnique.mock.calls[0]?.[0]?.select?.assignees)
+            .toBeFalsy();
+    });
+
+    it("skips stale cleanup on an unchanged recurring task with a complete future read", async () => {
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            generatedOccurrence({ scheduleVersion: 4 }),
+            generatedOccurrence({
+                id: 101,
+                periodKey: "2026-09",
+                dueDate: new Date("2026-09-10T00:00:00.000Z"),
+                originalDueDate: new Date("2026-09-10T00:00:00.000Z"),
+                scheduleVersion: 4,
+            }),
+            generatedOccurrence({
+                id: 102,
+                periodKey: "2026-10",
+                dueDate: new Date("2026-10-10T00:00:00.000Z"),
+                originalDueDate: new Date("2026-10-10T00:00:00.000Z"),
+                scheduleVersion: 4,
+            }),
+        ]));
+
+        await expect(generateRoutineTaskOccurrences(71, new Date("2026-08-04T04:00:00.000Z")))
+            .resolves.toEqual({ evaluated: 3, created: 0, existing: 3 });
+        expect(prismaMock.routineOccurrence.deleteMany).not.toHaveBeenCalled();
+        expect(prismaMock.routineOccurrence.updateMany).not.toHaveBeenCalled();
+        expect(prismaMock.routineOccurrence.upsert).not.toHaveBeenCalled();
     });
 
     it("generates the current month and two-month horizon once", async () => {
@@ -573,6 +612,7 @@ describe("NHF Routine occurrence generation", () => {
             .mockResolvedValueOnce([] as never)
             .mockResolvedValueOnce(asNever([
                 generatedOccurrence({ periodKey: "2026-08" }),
+                staleFutureOccurrence(),
                 generatedOccurrence({
                     id: 101,
                     periodKey: "2027-08",
@@ -731,6 +771,7 @@ describe("NHF Routine occurrence generation", () => {
             })),
         );
         prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            staleFutureOccurrence(),
             generatedOccurrence({
                 periodKey: "2026-07",
                 dueDate: new Date("2026-08-10T00:00:00.000Z"),
@@ -777,6 +818,7 @@ describe("NHF Routine occurrence generation", () => {
             })),
         );
         prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([
+            staleFutureOccurrence(),
             generatedOccurrence({
                 periodKey: "2027-08",
                 dueDate: new Date("2027-01-10T00:00:00.000Z"),
@@ -1033,6 +1075,7 @@ describe("NHF Routine occurrence generation", () => {
         prismaMock.routineTask.findUnique.mockResolvedValue(
             asNever(activeTask({ version: 5 })),
         );
+        prismaMock.routineOccurrence.findMany.mockResolvedValue(asNever([staleFutureOccurrence()]));
 
         await generateRoutineTaskOccurrences(
             71,
