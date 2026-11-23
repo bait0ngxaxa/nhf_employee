@@ -131,6 +131,7 @@ describe("IT analytics API adapter", () => {
         "categoryId=4",
         "type=INCIDENT&status=OPEN",
         "category=4&requesterUserId=41",
+        "period=7D&startAt=2026-09-19T17%3A00%3A00Z",
     ])("rejects duplicate or unsupported analytics parameters: %s", async (query) => {
         const response = await GET(request(`http://localhost/api/it/analytics?${query}`));
 

@@ -73,7 +73,7 @@ export function projectName(env) {
 }
 
 // Injectable process/database boundaries permit safety tests without Docker.
-export async function runIntegration({ env = process.env, execute = command, connect = createConnection, probe = false, cleanupOnly = false, profileRoutine = false, profileScheduler = false, profileStockAnalytics = false, stockAnalyticsTests = false } = {}) {
+export async function runIntegration({ env = process.env, execute = command, connect = createConnection, probe = false, cleanupOnly = false, profileRoutine = false, profileScheduler = false, profileStockAnalytics = false, stockAnalyticsTests = false, profileITResolution = false } = {}) {
     if (!cleanupOnly && env.TEST_DATABASE_URL) {
         throw new Error("External TEST_DATABASE_URL is not accepted; this runner owns a disposable Compose database");
     }
@@ -120,13 +120,22 @@ export async function runIntegration({ env = process.env, execute = command, con
                 "GRANT SELECT ON performance_schema.events_statements_summary_by_account_by_event_name TO 'integration_user'@'%'; "
                 + (profileScheduler ? "GRANT SELECT ON performance_schema.events_errors_summary_global_by_error TO 'integration_user'@'%'" : ""));
         }
+        if (profileITResolution) {
+            compose("exec", "-T", "-e", `MYSQL_PWD=${childEnv.MYSQL_INTEGRATION_ROOT_PASSWORD}`,
+                "mysql-integration", "mysql", "-uroot", "-e",
+                "GRANT SELECT ON performance_schema.events_statements_history TO 'integration_user'@'%'; "
+                + "GRANT SELECT ON performance_schema.events_errors_summary_global_by_error TO 'integration_user'@'%'; "
+                + "GRANT SELECT ON performance_schema.memory_summary_global_by_event_name TO 'integration_user'@'%'; "
+                + "UPDATE performance_schema.setup_consumers SET ENABLED='YES' "
+                + "WHERE NAME IN ('events_statements_history', 'events_statements_cpu')");
+        }
         const run = (label, cli, args, nodeOptions = []) => {
             write(`${label}...`);
             execute(process.execPath, [...nodeOptions, cli, ...args], childEnv);
             write(`${label} สำเร็จ`);
         };
         run("Generate Prisma Client", require.resolve("prisma/build/index.js"), ["generate"]);
-        if (!profileRoutine && !profileScheduler && !profileStockAnalytics && !stockAnalyticsTests) {
+        if (!profileRoutine && !profileScheduler && !profileStockAnalytics && !stockAnalyticsTests && !profileITResolution) {
             run("Routine recipient migration SQL coverage", resolve(root, "scripts/test-routine-reminder-recipient-contract.mjs"), []);
         }
         run("ใช้ Prisma migrations", require.resolve("prisma/build/index.js"), ["migrate", "deploy"]);
@@ -136,6 +145,8 @@ export async function runIntegration({ env = process.env, execute = command, con
             run("Profile Routine scheduler", resolve(root, "scripts/profile-routine-scheduler.mjs"), []);
         } else if (profileStockAnalytics) {
             run("Profile Stock Analytics", resolve(root, "scripts/profile-stock-analytics.mjs"), [], ["--expose-gc"]);
+        } else if (profileITResolution) {
+            run("Profile IT historical resolution", resolve(root, "scripts/profile-it-resolution.mjs"), []);
         } else {
             const filters = stockAnalyticsTests ? ["stock-analytics.integration.test.ts", "stock-concurrency.integration.test.ts"] : [];
             run("รัน Vitest", resolve(dirname(require.resolve("vitest/package.json")), "vitest.mjs"), ["run", "--config", "vitest.integration.config.ts", ...filters]);
@@ -159,7 +170,7 @@ export async function runIntegration({ env = process.env, execute = command, con
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
     try {
         const mode = process.argv.slice(2);
-        if (mode.length > 1 || (mode.length && !["--cleanup", "--verify-failure-cleanup", "--profile-routine", "--profile-scheduler", "--profile-stock-analytics", "--stock-analytics"].includes(mode[0]))) {
+        if (mode.length > 1 || (mode.length && !["--cleanup", "--verify-failure-cleanup", "--profile-routine", "--profile-scheduler", "--profile-stock-analytics", "--stock-analytics", "--profile-it-resolution"].includes(mode[0]))) {
             throw new Error("Unsupported integration runner arguments");
         }
         if (mode[0] === "--cleanup") {
@@ -172,6 +183,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
                 profileScheduler: mode[0] === "--profile-scheduler",
                 profileStockAnalytics: mode[0] === "--profile-stock-analytics",
                 stockAnalyticsTests: mode[0] === "--stock-analytics",
+                profileITResolution: mode[0] === "--profile-it-resolution",
             });
         }
     } catch (error) {

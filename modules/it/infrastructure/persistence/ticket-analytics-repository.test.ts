@@ -223,6 +223,9 @@ describe("IT Ticket analytics persistence", () => {
             },
             _min: { occurredAt: true },
         });
+        expect(findMany).toHaveBeenCalledTimes(2); // First-response and created timestamps only.
+        expect(result.resolvedEvents).toEqual([]);
+        expect(result.resolvedTickets).toEqual([]);
         expect(count).toHaveBeenCalledTimes(2); // period and untriaged only
         expect(queryRaw).toHaveBeenCalledTimes(1);
         const statement = queryRaw.mock.calls[0]?.[0];

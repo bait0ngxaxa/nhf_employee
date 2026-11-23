@@ -1,6 +1,6 @@
 import { Role, type ITTicketPriority } from "@prisma/client";
 import { Prisma } from "@prisma/client";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "@/lib/db/prisma";
 import {
@@ -859,6 +859,113 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
         }
     });
 
+    it("counts the first qualifying event in each period and ignores additional events without changing the full DTO", async () => {
+        const departmentId = await createDepartment("historical-periods");
+        const viewer = await createWorkforceUser("historical-periods", departmentId);
+        await grant(viewer.userId, "it.analytics.read");
+        const category = await prisma.iTTicketCategory.create({
+            data: { key: nextFixtureKey("historical-category"), name: "หมวดหมู่ย้อนหลัง", isActive: false },
+        });
+        trackedCategoryIds.add(category.id);
+        const createdAt = new Date("2026-08-01T17:00:00.000Z");
+        const start7 = new Date("2026-09-19T17:00:00.000Z");
+        const start30 = new Date("2026-08-27T17:00:00.000Z");
+        const reopened = await createTicket({
+            requester: viewer, type: "INCIDENT", status: "IN_PROGRESS", priority: "P1",
+            categoryId: category.id, createdAt,
+        });
+        const endOnly = await createTicket({
+            requester: viewer, type: "INCIDENT", status: "RESOLVED", categoryId: category.id, createdAt,
+        });
+        const uncategorized = await createTicket({
+            requester: viewer, type: "INCIDENT", status: "RESOLVED", createdAt,
+        });
+        await createResolvedEvent(reopened, viewer.userId, start30);
+        await createStatusEvent(reopened, viewer.userId, "RESOLVED", "IN_PROGRESS", new Date(+start30 + 1000));
+        await createResolvedEvent(reopened, viewer.userId, start7);
+        await createStatusEvent(reopened, viewer.userId, "RESOLVED", "IN_PROGRESS", new Date(+start7 + 1000));
+        await createResolvedEvent(uncategorized, viewer.userId, new Date(+start7 - 1));
+
+        const scope = { type: "INCIDENT", category: String(category.id) };
+        const weekly = await getITAnalyticsDashboard(viewer.context, { ...scope, period: "7D" }, NOW);
+        const monthly = await getITAnalyticsDashboard(viewer.context, { ...scope, period: "30D" }, NOW);
+        expect(weekly.summary).toMatchObject({ resolvedTickets: 1, currentBacklog: 1, averageResolutionMinutes: 49 * 24 * 60 });
+        expect(monthly.summary).toMatchObject({ resolvedTickets: 1, averageResolutionMinutes: 26 * 24 * 60 });
+        expect(weekly.trend.filter(({ resolved }) => resolved > 0)).toMatchObject([{ date: "2026-09-20", resolved: 1 }]);
+        expect(monthly.trend.filter(({ resolved }) => resolved > 0)).toMatchObject([{ date: "2026-08-28", resolved: 1 }]);
+        const uncategorizedScope = { type: "INCIDENT", category: "uncategorized" };
+        const zero = await getITAnalyticsDashboard(viewer.context, { ...uncategorizedScope, period: "7D" }, NOW);
+        expect(zero.summary).toMatchObject({ resolvedTickets: 0, averageResolutionMinutes: null });
+
+        await prisma.iTTicketEvent.createMany({
+            data: Array.from({ length: 512 }, (_, offset) => ({
+                ticketId: reopened, actorUserId: viewer.userId, kind: "STATUS_CHANGED", toStatus: "RESOLVED",
+                occurredAt: new Date(+createdAt + offset),
+            })),
+        });
+        await createResolvedEvent(reopened, viewer.userId, start7);
+        await createResolvedEvent(reopened, viewer.userId, new Date(+start7 + DAY_MS));
+        await createResolvedEvent(endOnly, viewer.userId, NOW);
+        await expect(getITAnalyticsDashboard(viewer.context, { ...scope, period: "7D" }, NOW)).resolves.toEqual(weekly);
+        await expect(getITAnalyticsDashboard(viewer.context, { ...scope, period: "30D" }, NOW)).resolves.toEqual(monthly);
+        await expect(getITAnalyticsDashboard(viewer.context, { ...uncategorizedScope, period: "7D" }, NOW)).resolves.toEqual(zero);
+    });
+
+    it("keeps a whole Dashboard snapshot while another transaction commits Ticket and event changes", async () => {
+        const departmentId = await createDepartment("resolution-snapshot");
+        const viewer = await createWorkforceUser("resolution-snapshot", departmentId);
+        await grant(viewer.userId, "it.analytics.read");
+        const category = await prisma.iTTicketCategory.create({
+            data: { key: nextFixtureKey("snapshot-category"), name: "หมวดหมู่ปัจจุบัน" },
+        });
+        trackedCategoryIds.add(category.id);
+        const createdAt = new Date("2026-09-20T17:00:00.000Z");
+        const historicallyResolved = await createTicket({
+            requester: viewer, type: "INCIDENT", status: "RESOLVED", priority: "P2", createdAt,
+        });
+        const newlyResolved = await createTicket({
+            requester: viewer, type: "INCIDENT", status: "IN_PROGRESS", priority: "P1", createdAt,
+        });
+        const earlier = new Date(+createdAt + 3_600_000);
+        await createResolvedEvent(historicallyResolved, viewer.userId, earlier);
+        const input = { period: "7D", type: "INCIDENT", category: "uncategorized" };
+        const baseline = await getITAnalyticsDashboard(viewer.context, input, NOW);
+        expect(baseline.summary).toMatchObject({ resolvedTickets: 1, currentBacklog: 1, averageResolutionMinutes: 60 });
+
+        const transaction = prisma.$transaction.bind(prisma);
+        const spy = vi.spyOn(prisma, "$transaction").mockImplementationOnce(async (read, options) => {
+            expect(options).toEqual({ isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+            return transaction(async (tx) => {
+                // Pin the reader snapshot, then wait for an independent writer to commit.
+                expect(await tx.iTTicket.count({ where: { id: { in: [historicallyResolved, newlyResolved] } } })).toBe(2);
+                await transaction(async (writer) => {
+                    await writer.iTTicket.update({
+                        where: { id: historicallyResolved }, data: { status: "IN_PROGRESS", priority: "P0", categoryId: category.id },
+                    });
+                    await writer.iTTicket.update({ where: { id: newlyResolved }, data: { status: "RESOLVED" } });
+                    await writer.iTTicketEvent.createMany({
+                        data: [
+                            { ticketId: historicallyResolved, actorUserId: viewer.userId, kind: "STATUS_CHANGED", fromStatus: "RESOLVED", toStatus: "IN_PROGRESS", occurredAt: new Date(+earlier + 1000) },
+                            { ticketId: historicallyResolved, actorUserId: viewer.userId, kind: "CATEGORY_CHANGED", toCategoryId: category.id, occurredAt: new Date(+earlier + 1000) },
+                            { ticketId: newlyResolved, actorUserId: viewer.userId, kind: "STATUS_CHANGED", fromStatus: "IN_PROGRESS", toStatus: "RESOLVED", occurredAt: new Date(+earlier + 3_600_000) },
+                        ],
+                    });
+                });
+                return read(tx);
+            }, options);
+        });
+        try {
+            await expect(getITAnalyticsDashboard(viewer.context, input, NOW)).resolves.toEqual(baseline);
+            expect(spy).toHaveBeenCalledTimes(1);
+        } finally {
+            spy.mockRestore();
+        }
+        const fresh = await getITAnalyticsDashboard(viewer.context, input, NOW);
+        expect(fresh.summary).toMatchObject({ resolvedTickets: 1, currentBacklog: 0, averageResolutionMinutes: 120 });
+        const all = await getITAnalyticsDashboard(viewer.context, { period: "7D" }, NOW);
+        expect(all.summary).toMatchObject({ resolvedTickets: 2, currentBacklog: 1, averageResolutionMinutes: 90 });
+    });
+
     it("allows analytics-only authority and denies defaults, ADMIN, ticket scopes, and inactive workforce", async () => {
         const departmentId = await createDepartment("auth");
         const defaults = await createWorkforceUser("default", departmentId);
@@ -872,6 +979,14 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             where: { id: inactiveAnalyticsUser.employeeId },
             data: { status: "INACTIVE" },
         });
+        const inactiveAccount = await createWorkforceUser("inactive-account", departmentId);
+        await grant(inactiveAccount.userId, "it.analytics.read");
+        await prisma.user.update({ where: { id: inactiveAccount.userId }, data: { isActive: false } });
+        const nonGlobal = await createWorkforceUser("non-global", departmentId);
+        // Exercise fail-closed resolution for an unsupported persisted grant.
+        await prisma.userCapabilityGrant.create({
+            data: { userId: nonGlobal.userId, capabilityKey: "it.analytics.read", scope: "OWN" },
+        });
 
         await expect(getITAnalyticsDashboard(defaults.context, "7D", NOW))
             .rejects.toBeInstanceOf(ITCapabilityDeniedError);
@@ -881,6 +996,10 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             .rejects.toBeInstanceOf(ITCapabilityDeniedError);
         await expect(getITAnalyticsDashboard(inactiveAnalyticsUser.context, "7D", NOW))
             .rejects.toBeInstanceOf(ITWorkforceDeniedError);
+        await expect(getITAnalyticsDashboard(inactiveAccount.context, "7D", NOW))
+            .rejects.toBeInstanceOf(ITWorkforceDeniedError);
+        await expect(getITAnalyticsDashboard(nonGlobal.context, "7D", NOW))
+            .rejects.toMatchObject({ name: "AuthorizationConfigurationError", code: "UNSUPPORTED_PERSISTED_SCOPE" });
 
         const analyticsOnly = await createWorkforceUser("analytics-only", departmentId);
         await grant(analyticsOnly.userId, "it.analytics.read");
