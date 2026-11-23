@@ -17,19 +17,8 @@ jobs:
           node-version: '24.22.1'
           cache: npm
       - run: npm ci
-      - name: Baseline Routine work items
-        run: |
-          files=(modules/routine/application/queries.ts modules/routine/domain/timing.ts)
-          for file in "${files[@]}"; do
-            git show 62ef4abb51fb6351ba1e06b67932395f77d2b320:"$file" > "$file"
-          done
-          node scripts/run-mysql-integration-tests.mjs --profile-routine
-      - name: Candidate Routine work items
-        run: |
-          for file in modules/routine/application/queries.ts modules/routine/domain/timing.ts; do
-            git show HEAD:"$file" > "$file"
-          done
-          node scripts/run-mysql-integration-tests.mjs --profile-routine
+      - name: Profile IT resolution index
+        run: node scripts/run-mysql-integration-tests.mjs --profile-routine
       - name: Verify disposable cleanup
         if: always()
         run: node scripts/run-mysql-integration-tests.mjs --cleanup
