@@ -71,6 +71,7 @@ function SidebarMenuItem({
     const IconComponent = item.icon;
     const disabled = item.comingSoon === true;
     const itemLabel = getItemLabel(item);
+    const visibleLabel = item.sidebarLabel ?? item.label;
 
     return (
         <div className="px-2">
@@ -82,7 +83,7 @@ function SidebarMenuItem({
                 <Button
                     type="button" variant="ghost" disabled={disabled}
                     aria-current={isActive ? "page" : undefined}
-                    aria-label={sidebarOpen ? undefined : itemLabel}
+                    aria-label={sidebarOpen && !disabled ? undefined : itemLabel}
                     title={sidebarOpen ? undefined : itemLabel}
                     className={cn(
                         "group/sidebar-item h-11 min-h-11 w-full cursor-pointer justify-start gap-3 rounded-xl border border-transparent text-sm font-medium transition-[background-color,border-color,color,opacity] duration-150 ease-out focus-visible:ring-sidebar-ring/50 focus-visible:ring-[3px]",
@@ -115,7 +116,7 @@ function SidebarMenuItem({
                     )}
                     {sidebarOpen && (
                         <span className="min-w-0 flex-1 text-left">
-                            <span className="block truncate">{item.unavailable ? (item.sidebarLabel ?? item.label) : itemLabel}</span>
+                            <span className="block truncate">{visibleLabel}</span>
                             {item.unavailable ? <span className="block truncate text-xs text-sidebar-foreground/70">ยังไม่พร้อมให้บริการ</span> : null}
                         </span>
                     )}
