@@ -305,7 +305,23 @@ State panels use a raised surface, a rounded border, an icon or shape tile, plai
 
 ### Module Quick-Action Card
 
-The dashboard's featured cards are the signature component. Each card combines a module-specific solid surface, a translucent sheen/corner, a compact icon tile, a `Quick action` marker, a two-line heading, supporting copy, and an arrow control. Stock, leave, routine, and IT use their own semantic tokens; the composition stays shared so the modules feel related rather than like separate products.
+The dashboard's featured cards are the signature component. Each card combines a module-specific solid surface, a translucent sheen and corner, a primary brand asset on the card surface, a `Quick action` marker, a two-line heading, supporting copy, and an arrow control. Stock, Leave, Routine, and IT use their own semantic tokens. Mobile Dashboard and LINE LIFF Home place the same artwork directly above the shortcut label on the existing page surface.
+
+### NHFapp Visual Identity System v1
+
+The Trusted Operations Desk uses a Fluent-inspired family of original vectors. Light arrives from the upper left. Rounded faces overlap darker silhouettes offset toward the lower right, with restrained gradients and one prominent detail per object. Leave pairs a calendar and approval stamp, Stock uses stacked cartons and packing tape, Routine uses a checklist and repeat loop, and IT-TICKET uses a monitor with a headset.
+
+| Level | Role | Usage |
+| --- | --- | --- |
+| 1 · Module identity | Recognizable artwork for a major NHF service | Primary artwork at 64px on Dashboard featured cards, Dashboard mobile shortcuts, and LINE LIFF Home. |
+| 2 · Menu identity | Simplified artwork for an individual destination | Foundation for future feature and administration menus. Review the destination and its size before adoption. |
+| 3 · Functional icon | An interface action, affordance, or state | Lucide for controls, status, navigation arrows, and existing sidebar, bottom navigation, and More icons. |
+
+- **Palette ownership** belongs to the corresponding module tokens in `app/globals.css`. Anchor Leave in Indigo (`#4f46e5`), Stock in Orange (`#ea580c`), Routine in Teal (`#0d9488`), and IT in `--module-it-solid` (`#1d4ed8`). Derive highlights and depth from the same family and review against light, dark, and module-colored surfaces.
+- **Variants** share a transparent `0 0 128 128` viewBox and consistent optical padding. Primary artwork supports 48–96px placements. At 20–32px use the compact artwork with simplified silhouettes and fewer details. Keep each self-contained SVG within 15 KB.
+- **Naming and ownership** use stable kebab-case identifiers. Module vectors live in `public/assets/modules/` as `<id>.svg` and `<id>-compact.svg`. Add new module or menu identities to `lib/ui/visual-assets.ts` with both sources and a Lucide fallback. Use the optional `MenuItem.asset` field when a menu opts in. Keep routes, permissions, ordering, and availability in their established owners.
+- **Accessibility** uses `BrandAsset` with empty alt text beside an equivalent destination label. Supply concise alt text when the artwork alone conveys information, and name icon-only controls independently. The image and fallback use the same layout space and accessible name. Keep a visible label or state for unavailable destinations and distinguish identities through silhouettes.
+- **Family review** compares proposed additions beside the existing four identities at 96, 64, 32, and 24px. Check optical weight, contrast, and recognizability before adding new placements. Keep the shared geometry, lighting, corner treatment, and palette ownership. Use original geometry and omit text, shadows, filters, raster layers, and external references inside the SVGs.
 
 ## Do's and Don'ts
 

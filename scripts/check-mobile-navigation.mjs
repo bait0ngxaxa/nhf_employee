@@ -24,6 +24,7 @@ const bundle = await build({
             import { DashboardMoreSection } from "./components/dashboard/sections/DashboardMoreSection";
             import { AnnouncementTicker } from "./modules/announcements/presentation/AnnouncementTicker";
             import { LiffAppShell } from "./components/liff/LiffAppShell";
+            import { LiffHomeApp } from "./components/liff/home/LiffHomeApp";
             import { DASHBOARD_MENU_GROUPS, getAvailableMenuGroups } from "./constants/dashboard";
             import { getDashboardMenuIdFromPathname, toDashboardMenuPath } from "./lib/ssot/routes";
             import { usePathname, useRouter } from "next/navigation";
@@ -42,6 +43,7 @@ const bundle = await build({
                 if (variant === "long") groups = groups.map(g => ({ ...g, items: g.items.map(i => i.id === "routine" ? { ...i, label: "บริการพนักงานและผู้ดูแลระบบที่มีชื่อภาษาไทยยาวมาก" } : i) }));
                 const user = { id: "fixture", name: "พนักงาน ทดสอบ", email: "fixture@example.test", role: "ADMIN", teams: [{ id: 1, name: "NHF" }], department: "NHF" };
                 const ui = { selectedMenu: getDashboardMenuIdFromPathname(pathname), mobileNavOpen: false, setMobileNavOpen() {}, desktopSidebarCollapsed: collapsed, setDesktopSidebarCollapsed: setCollapsed, router, handleMenuClick: id => router.push(toDashboardMenuPath(id)), handleSignOut: async () => setSignedOut(true) };
+                if (pathname === "/liff") return <LiffAppShell><LiffHomeApp /></LiffAppShell>;
                 if (pathname.startsWith("/liff")) return <LiffAppShell><main id="main" className="p-4"><h1>บริการผ่าน LINE</h1><div style={{height: "100vh"}}>เนื้อหาทดสอบ</div></main></LiffAppShell>;
                 return <DashboardDataContext.Provider value={{status: "authenticated", user, isAdmin: true, availableMenuGroups: groups}}><DashboardUIContext.Provider value={ui}><DashboardLayoutClient>{signedOut ? <h1>ออกจากระบบแล้ว (fixture)</h1> : pathname === "/dashboard/more" ? <DashboardMoreSection /> : pathname === "/dashboard" ? <DashboardHomeSection announcement={<AnnouncementTicker content={variant === "no-announcement" ? null : "ประกาศสำหรับพนักงาน NHF — ตรวจสอบข่าวสารก่อนเริ่มงาน"} />} /> : <section><h1 data-page-heading tabIndex={-1}>บริการทดสอบ</h1><form data-navigation-dirty="true"><textarea aria-label="ข้อความที่ยังไม่ได้บันทึก" defaultValue="ร่างข้อความ" /></form><div style={{ height: "110vh" }} /><div className="dashboard-floating-action fixed bottom-[calc(var(--dashboard-mobile-nav-height,0px)+1rem+env(safe-area-inset-bottom))] right-4 z-30"><button className="min-h-11 rounded-md bg-brand-solid p-3">บันทึก</button></div></section>}</DashboardLayoutClient></DashboardUIContext.Provider></DashboardDataContext.Provider>;
             }
@@ -54,6 +56,8 @@ const bundle = await build({
         context.onResolve({ filter: /^next\/(navigation|link|image|dynamic)$/ }, ({ path }) => ({ path, namespace: "fixture" }));
         context.onResolve({ filter: /^@\/components\/dashboard\/context$/ }, () => ({ path: resolve("components/dashboard/context/dashboard/DashboardContext.tsx") }));
         context.onResolve({ filter: /^@\/modules\/notification\/client$/ }, () => ({ path: "notifications", namespace: "fixture" }));
+        context.onResolve({ filter: /^@\/modules\/line\/client$/ }, ({ importer }) =>
+            importer === resolve("components/liff/home/LiffHomeApp.tsx") ? { path: "line", namespace: "fixture" } : undefined);
         context.onLoad({ filter: /.*/, namespace: "fixture" }, ({ path }) => {
             const common = `import React, { useMemo, useState, useEffect, useSyncExternalStore } from "react";`;
             const sources = {
@@ -66,9 +70,21 @@ const bundle = await build({
                     export const usePathname = () => { useSyncExternalStore(subscribe, get); return location.pathname; };
                     export const useSearchParams = () => { const route = useSyncExternalStore(subscribe, get); return useMemo(() => new URLSearchParams(location.search), [route]); };`,
                 "next/link": `${common} export const useLinkStatus = () => ({pending:false}); export default function Link({href, children, onNavigate, prefetch, scroll, ...props}) { return <a {...props} href={href} onClick={event => { if(event.metaKey || event.ctrlKey) return; event.preventDefault(); let blocked = false; onNavigate?.({preventDefault: () => blocked = true}); if(!blocked) { history.pushState(null, "", href); dispatchEvent(new PopStateEvent("popstate")); } }}>{children}</a>; }`,
-                "next/image": `${common} export default function Image({src, priority, fill, quality, ...props}) { return <img {...props} src={typeof src === "string" ? src : src.src} />; }`,
+                "next/image": `${common} export default function Image({src, priority, fill, quality, unoptimized, ...props}) { return <img {...props} src={typeof src === "string" ? src : src.src} />; }`,
                 "next/dynamic": `${common} export default function dynamic(load, options) { return function Dynamic(props) { const [Component, setComponent] = useState(null); useEffect(() => { load().then(module => setComponent(() => module.default)); }, []); return Component ? <Component {...props} /> : options?.loading?.() ?? null; }; }`,
                 notifications: `${common} export function NotificationDropdown() { return <button>การแจ้งเตือน</button>; }`,
+                line: `export class LiffApiError extends Error {}
+                    const workforce = { userId: 10, employeeId: 20, name: "พนักงาน ทดสอบ" };
+                    export const useLiffWorkforce = () => workforce;
+                    export async function fetchLiffHome() {
+                        const disabled = new URLSearchParams(location.search).has("fixture");
+                        const available = { enabled: true, status: "available" };
+                        return { workforce, modules: {
+                            stock: available, routine: available,
+                            leave: disabled ? { enabled: false, status: "unavailable" } : available,
+                            it: disabled ? { enabled: false, status: "coming-soon" } : available,
+                        } };
+                    }`,
             };
             return { contents: sources[path], loader: "tsx", resolveDir: process.cwd() };
         });
@@ -79,6 +95,11 @@ await writeFile(join(output, "fixture.js"), bundle.outputFiles.find(file => file
 const html = `<!doctype html><html lang="th"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><style>${css.css}\n${bundle.outputFiles.find(file => file.path.endsWith(".css"))?.text ?? ""}</style><body style="font-family:'Noto Sans Thai',sans-serif"><div id="root"></div><script src="/fixture.js"></script></body></html>`;
 const server = createServer(async (req, res) => {
     if (req.url === "/fixture.js") { res.setHeader("Content-Type", "text/javascript"); res.end(await readFile(join(output, "fixture.js"))); return; }
+    if (/^\/assets\/modules\/(?:stock|leave|routine|it-ticket)(?:-compact)?\.svg$/.test(req.url)) {
+        res.setHeader("Content-Type", "image/svg+xml");
+        res.end(await readFile(join("public", req.url)));
+        return;
+    }
     if (req.url?.startsWith("/api/")) { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify({ status: "linked" })); return; }
     if (req.url?.startsWith("/NHF")) { res.setHeader("Content-Type", "image/png"); res.end(await readFile(join("public", req.url))); return; }
     res.setHeader("Content-Type", "text/html; charset=utf-8"); res.end(html);
@@ -89,6 +110,23 @@ assert.ok(address && typeof address === "object");
 const origin = `http://127.0.0.1:${address.port}`;
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(resolve(process.env.PLAYWRIGHT_MODULE)).href : "playwright");
 const browser = await chromium.launch({ executablePath: process.env.MOBILE_NAV_BROWSER_PATH || undefined, headless: true });
+const assetSelector = 'img[src^="/assets/modules/"]';
+const expectedAssets = ["stock", "leave", "routine", "it-ticket"].map((id) => `/assets/modules/${id}.svg`);
+
+async function checkArtwork(scope, expected) {
+    const images = scope.locator(`${assetSelector}:visible`);
+    await images.last().waitFor();
+    await images.evaluateAll((elements) => Promise.all(elements.map((image) => image.decode())));
+    const assets = await images.evaluateAll((elements) => elements.map((image) => ({
+        source: image.getAttribute("src"),
+        alt: image.getAttribute("alt"),
+        width: image.offsetWidth,
+        height: image.offsetHeight,
+    })));
+    assert.deepEqual(assets.map((asset) => asset.source), expected);
+    assert.ok(assets.every((asset) => asset.alt === "" && asset.width === 64 && asset.height === 64));
+}
+
 let cases = 0;
 try {
     for (const width of (process.argv[2] ? [Number(process.argv[2])] : [320, 375, 390, 422, 768, 1024, 1440])) {
@@ -96,6 +134,9 @@ try {
             const page = await browser.newPage({ viewport: { width, height: 900 } });
             const errors = [];
             page.on("pageerror", (error) => errors.push(error.message));
+            page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+            page.on("requestfailed", (request) => errors.push(`${request.url()}: ${request.failure()?.errorText}`));
+            page.on("response", (response) => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
             for (const path of ["/dashboard", "/dashboard/more", "/dashboard/stock", "/liff/routine"]) {
                 await page.goto(origin + path);
                 await page.locator("#root > *").waitFor();
@@ -107,9 +148,11 @@ try {
                     assert.equal(await page.getByRole("navigation", { name: "เมนูหลักบนมือถือ" }).isVisible(), mobile);
                     assert.equal(await page.getByRole("complementary", { name: "แถบนำทางหลัก" }).isVisible(), !mobile);
                     if (path === "/dashboard") {
+                        await checkArtwork(page, expectedAssets);
                         const grid = page.getByRole("region", { name: "เมนูด่วน" });
                         assert.equal(await grid.isVisible(), mobile);
                         if (mobile) {
+                            assert.equal(await page.getByRole("navigation", { name: "เมนูหลักบนมือถือ" }).locator(assetSelector).count(), 0);
                             assert.equal(await grid.locator(".dashboard-compact-actions").evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length), width < 360 ? 3 : 4);
                             const boxes = await grid.getByRole("button").evaluateAll(items => items.map(el => { const b = el.getBoundingClientRect(); return { width: b.width, height: b.height }; }));
                             assert.ok(boxes.every(box => box.width >= 44 && box.height >= 112));
@@ -117,9 +160,9 @@ try {
                             const visual = await grid.locator("[data-shortcut-id]").evaluateAll(items => items.map(el => {
                                 const icon = el.querySelector("[data-shortcut-icon]");
                                 const label = el.querySelector("[data-shortcut-label]");
-                                return { transparent: getComputedStyle(el).backgroundColor === "rgba(0, 0, 0, 0)", border: getComputedStyle(el).borderWidth, iconSize: icon.getBoundingClientRect().width, labelOutside: label.parentElement === el, labelTransparent: getComputedStyle(label).backgroundColor === "rgba(0, 0, 0, 0)" };
+                                return { transparent: getComputedStyle(el).backgroundColor === "rgba(0, 0, 0, 0)", border: getComputedStyle(el).borderWidth, artworkTransparent: getComputedStyle(icon).backgroundColor === "rgba(0, 0, 0, 0)", labelOutside: label.parentElement === el, labelFits: label.scrollHeight <= label.clientHeight && label.scrollWidth <= label.clientWidth };
                             }));
-                            assert.ok(visual.every(item => item.transparent && item.border === "0px" && item.iconSize === 64 && item.labelOutside && item.labelTransparent));
+                            assert.ok(visual.every(item => item.transparent && item.border === "0px" && item.artworkTransparent && item.labelOutside && item.labelFits));
                             assert.equal(await page.evaluate(() => {
                                 const announcement = document.querySelector('[aria-label="ประกาศ"]');
                                 const heading = document.querySelector("#dashboard-home-heading");
@@ -130,6 +173,14 @@ try {
                             const toggle = page.getByRole("button", { name: "ย่อเมนู", exact: true });
                             await toggle.click();
                             assert.equal(await page.getByRole("button", { name: "ขยายเมนู", exact: true }).isVisible(), true);
+                            const sidebar = page.getByRole("complementary", { name: "แถบนำทางหลัก" });
+                            assert.equal(await sidebar.locator(assetSelector).count(), 0);
+                            assert.equal(await sidebar.getByRole("button", { name: "วัสดุและคลัง" }).locator("svg").count(), 1);
+                            if (screenshots && width === 1440 && theme === "light") {
+                                await page.waitForFunction(() => document.querySelector('aside[aria-label="แถบนำทางหลัก"]').getBoundingClientRect().width < 100);
+                                await page.getByRole("heading", { name: "Recommended" }).evaluate((heading) => heading.scrollIntoView({ block: "start", behavior: "instant" }));
+                                await page.screenshot({ animations: "disabled", path: join(screenshots, "1440-dashboard-collapsed-light.png") });
+                            }
                             await page.getByRole("button", { name: "ขยายเมนู", exact: true }).click();
                             await page.waitForFunction(() => document.querySelector('aside[aria-label="แถบนำทางหลัก"]').getBoundingClientRect().width >= 255);
                         }
@@ -169,7 +220,13 @@ try {
                     assert.equal(await page.getByRole("navigation", { name: "เมนูบริการ NHFapp ผ่าน LINE" }).isVisible(), true);
                     assert.equal(await page.getByRole("link", { name: "งานประจำ", exact: true }).getAttribute("aria-current"), "page");
                 }
-                if (screenshots && path !== "/dashboard/stock" && ((width === 390 && mobile) || (width === 1440 && path === "/dashboard"))) {
+                if (screenshots && (
+                    (path === "/dashboard" && [320, 390, 1024, 1440].includes(width))
+                    || (width === 390 && ["/dashboard/more", "/liff/routine"].includes(path))
+                )) {
+                    if (path === "/dashboard" && !mobile) {
+                        await page.getByRole("heading", { name: "Recommended" }).evaluate((heading) => heading.scrollIntoView({ block: "start", behavior: "instant" }));
+                    }
                     await page.screenshot({ animations: "disabled", path: join(screenshots, `${width}-${path.replaceAll("/", "-").slice(1)}-${theme}.png`) });
                 }
                 assert.deepEqual(errors, [], `${width} ${theme} ${path}: runtime errors`);
@@ -186,10 +243,47 @@ try {
                     if (variant === "long") assert.equal(await grid.getByRole("button", { name: "งานประจำ" }).evaluate(el => el.scrollWidth <= el.clientWidth), true);
                     if (variant === "no-announcement") assert.equal(await page.getByRole("region", { name: "ประกาศ", exact: true }).count(), 0);
                     if (variant === "unavailable") assert.equal(await grid.getByText("ยังไม่พร้อม", { exact: true }).isVisible(), true);
-                    if (screenshots && width === 390 && ["no-announcement", "unavailable", "limited"].includes(variant)) await page.screenshot({ animations: "disabled", path: join(screenshots, `390-dashboard-${variant}-${theme}.png`) });
+                    if (variant === "limited") await checkArtwork(grid, [expectedAssets[0], expectedAssets[2]]);
+                    if (variant === "disabled") await checkArtwork(grid, [expectedAssets[1]]);
+                    if (variant === "unavailable") await checkArtwork(grid, expectedAssets);
+                    if (screenshots && width === 390 && ["disabled", "unavailable", "limited", "no-announcement"].includes(variant)) await page.screenshot({ animations: "disabled", path: join(screenshots, `390-dashboard-${variant}-${theme}.png`) });
                     cases++;
                 }
             }
+            if (width === 390) {
+                for (const disabled of [false, true]) {
+                    await page.goto(origin + (disabled ? "/liff?fixture=disabled" : "/liff"));
+                    if (theme === "dark") await page.evaluate(() => document.documentElement.classList.add("dark"));
+                    const grid = page.locator("[data-shortcut-grid]");
+                    await checkArtwork(grid, expectedAssets);
+                    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+                    const nav = page.getByRole("navigation", { name: "เมนูบริการ NHFapp ผ่าน LINE" });
+                    assert.equal(await nav.isVisible(), true);
+                    assert.equal(await nav.locator(assetSelector).count(), 0);
+                    const stock = grid.getByRole("link", { name: "เบิกวัสดุ" });
+                    await page.keyboard.press("Tab");
+                    await stock.focus();
+                    assert.equal(await stock.evaluate((element) => element.matches(":focus-visible") && getComputedStyle(element).boxShadow !== "none"), true);
+                    await stock.blur();
+                    if (disabled) {
+                        assert.equal(await grid.locator('[aria-disabled="true"]').count(), 2);
+                        assert.equal(await grid.getByRole("link").count(), 2);
+                        assert.equal(await grid.getByText("ยังไม่พร้อม", { exact: true }).isVisible(), true);
+                        assert.equal(await grid.getByText("เร็ว ๆ นี้", { exact: true }).isVisible(), true);
+                    }
+                    if (screenshots) await page.screenshot({ animations: "disabled", path: join(screenshots, `390-liff-home${disabled ? "-disabled" : ""}-${theme}.png`) });
+                    if (!disabled) {
+                        const artworkSlot = stock.locator("[data-shortcut-icon]");
+                        const before = await artworkSlot.boundingBox();
+                        await artworkSlot.locator("img").dispatchEvent("error");
+                        await artworkSlot.locator('svg[aria-hidden="true"]').waitFor();
+                        assert.deepEqual(await artworkSlot.boundingBox(), before);
+                        assert.equal(await stock.getByRole("img").count(), 0);
+                    }
+                    cases++;
+                }
+            }
+            assert.deepEqual(errors, [], `${width} ${theme}: unexpected browser or network errors`);
             await page.close();
         }
     }
