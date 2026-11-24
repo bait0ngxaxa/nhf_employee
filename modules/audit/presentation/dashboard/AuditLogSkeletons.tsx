@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { AdministrativeHeadingSkeleton } from "@/components/dashboard/feedback/SectionSkeleton";
 
 function AuditLogViewerSkeletonContent(): ReactElement {
     return (
@@ -86,10 +87,7 @@ export function AuditLogsSectionSkeleton(): ReactElement {
             aria-label="กำลังโหลดหน้าบันทึกการใช้งาน"
         >
             <div className="min-w-0 space-y-8 p-4 md:p-8">
-                <div className="min-w-0 space-y-2">
-                    <Skeleton className="h-8 w-56 max-w-full" />
-                    <Skeleton className="h-4 w-72 max-w-full" />
-                </div>
+                <AdministrativeHeadingSkeleton />
                 <AuditLogViewerSkeletonContent />
             </div>
         </div>

@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AdministrativeHeadingSkeleton } from "@/components/dashboard/feedback/SectionSkeleton";
 
 function FieldSkeleton(): ReactElement {
     return (
@@ -115,13 +116,7 @@ export function EmailRequestSectionSkeleton(): ReactElement {
             aria-label="กำลังโหลดหน้าส่งคำร้องพนักงานใหม่"
         >
             <div className="space-y-8">
-                <div className="flex min-w-0 items-center gap-4">
-                    <Skeleton className="h-12 w-12 rounded-2xl" />
-                    <div className="min-w-0 space-y-2">
-                        <Skeleton className="h-8 w-72 max-w-full" />
-                        <Skeleton className="h-4 w-96 max-w-full" />
-                    </div>
-                </div>
+                <AdministrativeHeadingSkeleton />
                 <FormSkeleton />
                 <HistorySkeleton />
             </div>

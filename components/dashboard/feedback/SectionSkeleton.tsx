@@ -23,6 +23,18 @@ export function SectionHeaderSkeleton({
     );
 }
 
+export function AdministrativeHeadingSkeleton(): ReactElement {
+    return (
+        <div className="flex min-w-0 items-start gap-3" aria-hidden="true">
+            <Skeleton className="size-8 shrink-0 rounded-lg sm:size-12" />
+            <div className="min-w-0 space-y-1">
+                <Skeleton className="h-8 w-56 max-w-full" />
+                <Skeleton className="h-5 w-80 max-w-full" />
+            </div>
+        </div>
+    );
+}
+
 export function TabsSkeleton({ count = 4 }: { count?: number }): ReactElement {
     return (
         <div className="min-w-0 max-w-full overflow-hidden pb-1">
@@ -154,10 +166,7 @@ export function FormSectionSkeleton(): ReactElement {
         >
             <div className="space-y-8 p-4 md:p-8">
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                    <div className="min-w-0 space-y-2">
-                        <Skeleton className="h-8 w-56 max-w-full" />
-                        <Skeleton className="h-4 w-72 max-w-full" />
-                    </div>
+                    <AdministrativeHeadingSkeleton />
                     <Skeleton className="h-11 w-full sm:w-36" />
                 </div>
 
@@ -195,10 +204,7 @@ export function ImportSectionSkeleton(): ReactElement {
             aria-label="กำลังโหลดหน้านำเข้าพนักงาน"
         >
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                <div className="space-y-2">
-                    <Skeleton className="h-8 w-64 max-w-full" />
-                    <Skeleton className="h-4 w-80 max-w-full" />
-                </div>
+                <AdministrativeHeadingSkeleton />
                 <Skeleton className="h-11 w-full sm:w-36" />
             </div>
             <div className="border-b border-border-subtle pb-4">
