@@ -314,14 +314,28 @@ The Trusted Operations Desk uses a Fluent-inspired family of original vectors. L
 | Level | Role | Usage |
 | --- | --- | --- |
 | 1 · Module identity | Recognizable artwork for a major NHF service | Primary artwork at 64px on Dashboard featured cards, Dashboard mobile shortcuts, and LINE LIFF Home. |
-| 2 · Menu identity | Simplified artwork for an individual destination | Foundation for future feature and administration menus. Review the destination and its size before adoption. |
-| 3 · Functional icon | An interface action, affordance, or state | Lucide for controls, status, navigation arrows, and existing sidebar, bottom navigation, and More icons. |
+| 2 · Menu identity | Simplified artwork for an individual destination | Primary artwork on Dashboard regular service cards and compact artwork in mobile More. |
+| 3 · Functional icon | An interface action, affordance, or state | Lucide for controls, status, navigation arrows, Sidebar, Bottom Navigation, and utility actions in More. |
 
 - **Palette ownership** belongs to the corresponding module tokens in `app/globals.css`. Anchor Leave in Indigo (`#4f46e5`), Stock in Orange (`#ea580c`), Routine in Teal (`#0d9488`), and IT in `--module-it-solid` (`#1d4ed8`). Derive highlights and depth from the same family and review against light, dark, and module-colored surfaces.
 - **Variants** share a transparent `0 0 128 128` viewBox and consistent optical padding. Primary artwork supports 48–96px placements. At 20–32px use the compact artwork with simplified silhouettes and fewer details. Keep each self-contained SVG within 15 KB.
 - **Naming and ownership** use stable kebab-case identifiers. Module vectors live in `public/assets/modules/` as `<id>.svg` and `<id>-compact.svg`. Statically import both sources in `lib/ui/visual-assets.ts` and register a Lucide fallback. Next.js serves the resulting build assets to both channels. Use the optional `MenuItem.asset` field when a menu opts in. Keep routes, permissions, ordering, and availability in their established owners.
 - **Accessibility** uses `BrandAsset` with empty alt text beside an equivalent destination label. Supply concise alt text when the artwork alone conveys information, and name icon-only controls independently. The image and fallback use the same layout space and accessible name. Keep a visible label or state for unavailable destinations and distinguish identities through silhouettes.
 - **Family review** compares proposed additions beside the existing four identities at 96, 64, 32, and 24px. Check optical weight, contrast, and recognizability before adding new placements. Keep the shared geometry, lighting, corner treatment, and palette ownership. Use original geometry and omit text, shadows, filters, raster layers, and external references inside the SVGs.
+
+### NHFapp Visual Identity System v1.2 — Menu Identity Assets
+
+Level 2 gives individual destinations a recognizable silhouette with a quieter palette and fewer layers than Level 1. Use an upper-left highlight, rounded geometry, a lower-right depth edge, and one distinguishing detail. The existing featured modules retain their product-level artwork and prominence.
+
+| Family | Artwork | Palette ownership |
+| --- | --- | --- |
+| Workforce administration | Employee Management uses an ID card with a portrait and records. Add Employee shares that card with an addition mark. Import Employee uses a sheet and an arrow entering a tray. New Employee Request nests a workforce card in an envelope. | NHF brand blue from `--brand-surface` (#f0f9ff), `--brand-surface-strong` (#e0f2fe), `--brand-border-default` (#bae6fd), `--brand-foreground` (#0284c7), `--brand-emphasis` (#0369a1), and `--brand-heading` (#075985). |
+| Organizational communication | Announcement Management uses an asymmetric megaphone and a short broadcast signal. | The same NHF brand-blue family. |
+| System administration | Authorization Administration uses a shield and key. Audit Logs uses an offset ledger with a vertical event sequence. | Cool neutrals from `--content-on-inverted-strong` (#f1f5f9), `--content-border` (#cbd5e1), `--content-muted` (#64748b), `--content-secondary` (#475569), and `--content-body` (#334155). |
+
+- **Ownership and naming.** Store `<menu-id>.svg` and `<menu-id>-compact.svg` in `public/assets/menus/`. Embed the token values above as SVG fills and validate contrast on both themes. Add both static imports to the existing `VISUAL_ASSETS` registry and reference the ID through `MenuItem.asset`. Resolve the menu's existing Lucide icon from the fallback entry.
+- **Approved surfaces.** Use `BrandAsset` primary at 32–48px on Dashboard regular service cards and compact at 24px in the mobile More list, including existing module artwork where those destinations appear. Employee Import appears through the existing capability-dependent More projection. Sidebar and Bottom Navigation are outside the v1.2 migration scope and continue to use Lucide.
+- **Accessibility and extension.** Keep adjacent labels as the source of accessible names and use decorative artwork with empty alt text. Keep state labels visible, reserve the same geometry for the fallback, and distinguish destinations through silhouette and detail. Review new assets beside the Level 1 families at 96, 48, 32, 24, and 20px on light and dark surfaces. Extend the existing registry and keep route, capability, ordering, and availability rules in their current owners.
 
 ## Do's and Don'ts
 

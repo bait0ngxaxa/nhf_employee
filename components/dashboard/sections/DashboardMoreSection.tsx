@@ -2,6 +2,7 @@
 
 import { Bell, Smartphone } from "lucide-react";
 import type { ReactElement } from "react";
+import { BrandAsset } from "@/components/brand/BrandAsset";
 import { useDashboardDataContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { DashboardAccountMenu } from "@/components/dashboard/layout/DashboardAccountMenu";
 import { DashboardNavigationLink } from "@/components/dashboard/layout/DashboardNavigationLink";
@@ -25,7 +26,24 @@ export function DashboardMoreSection(): ReactElement {
                         <ul className="divide-y divide-border-subtle rounded-xl border border-border-subtle bg-surface-raised">
                             {group.items.map((item) => {
                                 const Icon = item.icon;
-                                const content = <><Icon className="size-5 shrink-0 text-brand-foreground" aria-hidden="true" /><span className="min-w-0 [overflow-wrap:anywhere]">{item.sidebarLabel ?? item.label}{item.unavailable ? <span className="block text-xs text-content-muted">ยังไม่พร้อมให้บริการ</span> : null}</span></>;
+                                const content = (
+                                    <>
+                                        {item.asset ? (
+                                            <BrandAsset
+                                                asset={item.asset}
+                                                variant="compact"
+                                                size="sm"
+                                                className={item.unavailable || item.comingSoon ? "grayscale" : undefined}
+                                            />
+                                        ) : (
+                                            <Icon className="size-5 shrink-0 text-brand-foreground" aria-hidden="true" />
+                                        )}
+                                        <span className="min-w-0 [overflow-wrap:anywhere]">
+                                            {item.sidebarLabel ?? item.label}
+                                            {item.unavailable ? <span className="block text-xs text-content-muted">ยังไม่พร้อมให้บริการ</span> : null}
+                                        </span>
+                                    </>
+                                );
                                 const className = "flex min-h-14 items-center gap-3 rounded-lg p-3 text-sm font-medium text-content-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-focus hover:bg-surface-subtle";
                                 return <li key={item.id}>{item.comingSoon ? <span className={className}>{content}<span>เร็วๆ นี้</span></span> : <DashboardNavigationLink href={toDashboardMenuPath(item.id)} className={className}>{content}</DashboardNavigationLink>}</li>;
                             })}

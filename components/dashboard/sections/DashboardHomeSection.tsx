@@ -209,12 +209,7 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps): Rea
 }
 
 interface RegularCardProps {
-    item: {
-        id: string;
-        label: string;
-        description?: string;
-        comingSoon?: boolean;
-    };
+    item: Pick<MenuItem, "label" | "description" | "comingSoon" | "asset" | "unavailable">;
     config: (typeof MENU_ITEM_CONFIG)[string];
     onClickFn: () => void;
 }
@@ -246,7 +241,14 @@ function RegularCard({
                 </span>
             )}
 
-            <div className="flex h-full flex-col p-5 md:p-6">
+            <div className="flex h-full flex-col gap-2 p-5 md:p-6">
+                {item.asset && !config.featured && (
+                    <BrandAsset
+                        asset={item.asset}
+                        size="lg"
+                        className={cn("size-8 xl:size-12", (disabled || item.unavailable) && "grayscale")}
+                    />
+                )}
                 <div className="mt-auto">
                     <h3
                         className={cn(
