@@ -227,7 +227,7 @@ The product is an Operate-mode application: a desktop shell frames scrollable wo
 - **Content frames:** The dashboard home uses a `max-w-7xl` frame (`80rem`), large management sections commonly use `max-w-6xl` (`72rem`), and focused forms use narrower `max-w-3xl` frames (`48rem`). Center content and avoid full-bleed data unless the table genuinely needs the width.
 - **Rhythm:** The recurring spacing cadence is `0.5rem`, `1rem`, `1.5rem`, and `2rem`, with larger `2.5rem` section padding at wide desktop. Section shells step from `1rem` padding on small screens to `1.5rem` and `2.5rem` on larger layouts.
 - **Responsive density:** Grids move from one column to two, three, and four columns as space permits. Featured module cards are one column on narrow screens and become multi-column/row layouts at container breakpoints. Tabs scroll horizontally on small screens and distribute across the available width on desktop.
-- **LINE/LIFF:** The mobile shell is capped at `max-w-lg` (`32rem`) and uses a sticky header plus a four-column bottom nav. Use `env(safe-area-inset-*)` for edge padding and keep important actions at least `2.75rem` high.
+- **LINE/LIFF:** The mobile shell is capped at `max-w-lg` (`32rem`) and uses a sticky header plus a five-column bottom nav. Use `env(safe-area-inset-*)` for edge padding and keep important actions at least `2.75rem` high.
 
 **The Progressive Density Rule.** Add columns and breathing room as the viewport grows; do not shrink text or touch targets to force desktop density onto mobile.
 
@@ -291,9 +291,9 @@ Buttons should feel direct, calm, and dependable: one clear action, medium-weigh
 
 ### Navigation
 
-- **Desktop sidebar:** `16rem` wide by default, `18rem` at `2xl`, or `5rem` collapsed. It uses `sidebar` background and border tokens. Items are at least `2.75rem` high with `rounded-xl`; active items use sidebar accent plus a brand-colored icon tile.
+- **Desktop sidebar:** `16rem` wide by default, `18rem` at `2xl`, or `5rem` collapsed. It uses `sidebar` background and border tokens. Items are at least `2.75rem` high with `rounded-xl`; active items use sidebar accent. Functional Lucide items also use a brand-colored icon tile.
 - **Utility bar:** Sticky at the top of the workspace with a faint bottom border and a translucent surface. Keep notifications, account controls, and the mobile menu trigger in the same predictable row.
-- **Mobile/LIFF:** The LIFF header is sticky and safe-area aware. The bottom nav is a four-column, `2.75rem`-minimum control with a small brand-colored active rule and label; inactive items stay muted but remain fully legible.
+- **Mobile/LIFF:** The LIFF header is sticky and safe-area aware. The bottom nav uses five columns, `3rem`-minimum controls, and a small brand-colored active rule. Inactive labels stay muted and the artwork retains its original colors.
 
 ### Section Tabs
 
@@ -314,7 +314,7 @@ The Trusted Operations Desk uses a Fluent-inspired family of original vectors. L
 | Level | Role | Usage |
 | --- | --- | --- |
 | 1 · Module identity | Recognizable artwork for a major NHF service | Primary artwork at 64px on Dashboard featured cards, Dashboard mobile shortcuts, and LINE LIFF Home. |
-| 2 · Menu identity | Simplified artwork for an individual destination | Primary artwork on Dashboard regular service cards and compact artwork in mobile More. |
+| 2 · Menu identity | Simplified artwork for an individual destination | Primary artwork on Dashboard regular service cards and compact artwork in mobile More and persistent Dashboard navigation. |
 | 3 · Functional icon | An interface action, affordance, or state | Lucide for controls, status, navigation arrows, Home, More, utility actions, and destinations without branded artwork. |
 
 - **Palette ownership** belongs to the corresponding module tokens in `app/globals.css`. Anchor Leave in Indigo (`#4f46e5`), Stock in Orange (`#ea580c`), Routine in Teal (`#0d9488`), and IT in `--module-it-solid` (`#1d4ed8`). Derive highlights and depth from the same family and review against light, dark, and module-colored surfaces.
