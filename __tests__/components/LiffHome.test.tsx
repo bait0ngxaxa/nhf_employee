@@ -137,31 +137,31 @@ describe("LIFF home", () => {
         expect(screen.getByText("บริการของฉัน")).toBeInTheDocument();
     });
 
-    it("keeps labels outside transparent shortcut wrappers and preserves module tiles and icons", async () => {
+    it("keeps labels outside transparent artwork slots and maps each shortcut to its module identity", async () => {
         const { container } = render(<LiffHomeApp />);
         await screen.findByRole("link", { name: "เบิกวัสดุ" });
 
-        const shortcutStyles = [
-            ["stock", "bg-module-stock-dashboard-surface", "lucide-boxes"],
-            ["leave", "bg-module-leave-dashboard-surface", "lucide-calendar-range"],
-            ["routine", "bg-module-routine-dashboard-surface", "lucide-clipboard-check"],
-            ["it", "bg-module-it-dashboard-surface", "lucide-headset"],
+        const shortcutAssets = [
+            ["stock", "stock"],
+            ["leave", "leave"],
+            ["routine", "routine"],
+            ["it", "it-ticket"],
         ] as const;
 
-        for (const [key, surfaceClassName, iconClassName] of shortcutStyles) {
+        for (const [key, asset] of shortcutAssets) {
             const shortcut = container.querySelector<HTMLElement>(`[data-shortcut-id="${key}"]`);
-            const tile = shortcut?.querySelector<HTMLElement>("[data-shortcut-icon]");
+            const artwork = shortcut?.querySelector<HTMLElement>("[data-shortcut-icon]");
+            const image = artwork?.querySelector("img");
             const label = shortcut?.querySelector<HTMLElement>("[data-shortcut-label]");
 
             expect(shortcut).toHaveClass("bg-transparent", "min-h-28", "focus-visible:ring-2");
             expect(shortcut?.className).not.toMatch(/\b(?:border|shadow|bg-module)-/);
             expect(shortcut?.children).toHaveLength(2);
-            expect(tile?.parentElement).toBe(shortcut);
-            expect(tile).toHaveClass("size-16", "rounded-2xl", surfaceClassName, "text-content-on-brand");
-            expect(tile?.querySelector("svg")).toHaveClass("size-7", iconClassName);
+            expect(artwork?.parentElement).toBe(shortcut);
+            expect(image && new URL(image.src).pathname).toBe(`/assets/modules/${asset}.svg`);
+            expect(image).toHaveAttribute("alt", "");
             expect(label?.parentElement).toBe(shortcut);
             expect(label).toHaveClass("line-clamp-2", "h-10");
-            expect(tile?.textContent).not.toContain(label?.textContent ?? "");
         }
     });
 
@@ -184,7 +184,7 @@ describe("LIFF home", () => {
         expect(leave?.querySelector("[data-shortcut-label]")).toHaveTextContent("วันลา");
         expect(leave?.querySelector("[data-shortcut-status]")).toHaveTextContent("ยังไม่พร้อม");
         expect(leave?.querySelector("[data-shortcut-icon]")).toHaveClass(
-            "bg-surface-raised",
+            "grayscale",
             "text-content-muted",
         );
         expect(screen.queryByRole("link", { name: "วันลา" })).not.toBeInTheDocument();

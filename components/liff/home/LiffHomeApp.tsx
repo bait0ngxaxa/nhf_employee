@@ -1,12 +1,5 @@
 "use client";
 
-import {
-    Boxes,
-    CalendarRange,
-    ClipboardCheck,
-    Headset,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import {
     useCallback,
@@ -17,6 +10,7 @@ import {
 } from "react";
 
 import { LiffApiError, useLiffWorkforce } from "@/modules/line/client";
+import { BrandAsset } from "@/components/brand/BrandAsset";
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import { fetchLiffHome } from "@/modules/line/client";
 import type {
@@ -24,6 +18,7 @@ import type {
     LiffHomeResponse,
 } from "@/modules/line/client";
 import { APP_ROUTES } from "@/lib/ssot/routes";
+import type { VisualAssetKey } from "@/lib/ui/visual-assets";
 import { cn } from "@/lib/ui/utils";
 
 type LiffHomeState = "LOADING" | "READY" | "ERROR";
@@ -32,8 +27,7 @@ interface ModuleShortcutConfig {
     key: keyof LiffHomeResponse["modules"];
     label: string;
     href: string;
-    icon: LucideIcon;
-    surfaceClassName: string;
+    asset: VisualAssetKey;
 }
 
 const MODULE_SHORTCUTS: readonly ModuleShortcutConfig[] = [
@@ -41,29 +35,25 @@ const MODULE_SHORTCUTS: readonly ModuleShortcutConfig[] = [
         key: "stock",
         label: "เบิกวัสดุ",
         href: APP_ROUTES.line.stock,
-        icon: Boxes,
-        surfaceClassName: "bg-module-stock-dashboard-surface",
+        asset: "stock",
     },
     {
         key: "leave",
         label: "วันลา",
         href: APP_ROUTES.line.leave,
-        icon: CalendarRange,
-        surfaceClassName: "bg-module-leave-dashboard-surface",
+        asset: "leave",
     },
     {
         key: "routine",
         label: "งานประจำ",
         href: APP_ROUTES.line.routine,
-        icon: ClipboardCheck,
-        surfaceClassName: "bg-module-routine-dashboard-surface",
+        asset: "routine",
     },
     {
         key: "it",
         label: "บริการ IT",
         href: APP_ROUTES.line.it,
-        icon: Headset,
-        surfaceClassName: "bg-module-it-dashboard-surface",
+        asset: "it-ticket",
     },
 ];
 
@@ -87,7 +77,6 @@ interface ModuleShortcutProps {
 }
 
 function ModuleShortcut({ config, module }: ModuleShortcutProps): ReactElement {
-    const Icon = config.icon;
     const className = cn(
         "group flex min-h-28 min-w-0 w-full flex-col items-center gap-2 bg-transparent px-0.5 pt-1 pb-2 text-center text-content-primary",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dashboard-focus focus-visible:ring-offset-2",
@@ -97,14 +86,12 @@ function ModuleShortcut({ config, module }: ModuleShortcutProps): ReactElement {
             <span
                 data-shortcut-icon
                 className={cn(
-                    "flex size-16 shrink-0 items-center justify-center rounded-2xl transition-transform duration-150 group-active:translate-y-px motion-reduce:transform-none",
-                    module.enabled
-                        ? [config.surfaceClassName, "text-content-on-brand"]
-                        : "bg-surface-raised text-content-muted",
+                    "flex size-16 shrink-0 items-center justify-center transition-transform duration-150 group-active:translate-y-px motion-reduce:transform-none",
+                    !module.enabled && "text-content-muted opacity-60 grayscale",
                 )}
                 aria-hidden="true"
             >
-                <Icon className="size-7" aria-hidden="true" />
+                <BrandAsset asset={config.asset} size="xl" />
             </span>
             <span
                 data-shortcut-label
