@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/p
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import sharp from "sharp";
+import sharp, { type OverlayOptions, type Sharp } from "sharp";
 
 import {
     getNhfRichMenuImagePath,
@@ -35,7 +35,7 @@ const TILES = [
 
 const TILE_WIDTH = NHF_RICH_MENU_WIDTH / TILES.length;
 
-function renderThaiText(text: string, fontPath: string, fontSize: number): sharp.Sharp {
+function renderThaiText(text: string, fontPath: string, fontSize: number): Sharp {
     return sharp({
         text: {
             text: `<span foreground="${LABEL_COLOR}" font_weight="700">${text}</span>`,
@@ -96,7 +96,7 @@ async function renderTile(
         throw new Error(`Rich Menu artwork or label is empty: ${tile.source}`);
     }
 
-    const layers: sharp.OverlayOptions[] = [
+    const layers: OverlayOptions[] = [
         { input: artwork, left: Math.floor((TILE_WIDTH - ARTWORK_SIZE) / 2), top: ARTWORK_TOP },
         { input: label.data, left: Math.round((TILE_WIDTH - label.info.width) / 2), top: labelTop },
     ];
