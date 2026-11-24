@@ -1,5 +1,7 @@
 "use client";
 
+import { WorkspaceHeading } from "@/components/ui/workspace-heading";
+
 import { AuditLogViewer } from "./AuditLogViewer";
 import { AuditLogsProvider } from "./AuditLogsProvider";
 
@@ -8,17 +10,19 @@ export function AuditLogsSection() {
         <AuditLogsProvider>
             <div className="min-h-[calc(100dvh-6rem)]">
                 <div className="min-w-0 space-y-8 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
-                    <header className="min-w-0 space-y-1">
-                        <h1
-                            data-page-heading
-                            tabIndex={-1}
-                            className="text-2xl font-bold leading-tight tracking-tight text-content-heading [overflow-wrap:anywhere] sm:text-3xl"
-                        >
-                            บันทึกการใช้งาน
-                        </h1>
-                        <p className="font-medium text-content-neutral-muted">
-                            ประวัติการดำเนินการในระบบ
-                        </p>
+                    <header>
+                        <WorkspaceHeading asset="audit-logs" className="space-y-1">
+                            <h1
+                                data-page-heading
+                                tabIndex={-1}
+                                className="text-2xl font-bold leading-tight tracking-tight text-content-heading [overflow-wrap:anywhere] sm:text-3xl"
+                            >
+                                บันทึกการใช้งาน
+                            </h1>
+                            <p className="font-medium text-content-neutral-muted">
+                                ประวัติการดำเนินการในระบบ
+                            </p>
+                        </WorkspaceHeading>
                     </header>
 
                     <AuditLogViewer />

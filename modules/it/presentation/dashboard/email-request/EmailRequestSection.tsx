@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceHeading } from "@/components/ui/workspace-heading";
 import type { ReactElement } from "react";
 import { EmailRequestForm } from "./EmailRequestForm";
 import { EmailRequestHistory } from "./EmailRequestHistory";
@@ -19,7 +20,7 @@ function EmailRequestContent({
         <section className="min-h-[calc(100dvh-6rem)]">
             <div className="mx-auto max-w-6xl space-y-8">
                 <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-                    <div className="min-w-0 space-y-1">
+                    <WorkspaceHeading asset="email-request" className="min-w-0 space-y-1">
                         <h1
                             data-page-heading
                             tabIndex={-1}
@@ -30,7 +31,7 @@ function EmailRequestContent({
                         <p className="text-sm font-medium leading-6 text-content-secondary [overflow-wrap:anywhere]">
                             ส่งคำร้องอีเมล ระบบสารบรรณ และพื้นที่จัดเก็บไฟล์ให้ทีมไอที
                         </p>
-                    </div>
+                    </WorkspaceHeading>
                 </div>
 
                 {capabilities.canCreateRequests ? (

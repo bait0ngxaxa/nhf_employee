@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceHeading } from "@/components/ui/workspace-heading";
 import { Button } from "@/components/ui/button";
 import {
     Card,
@@ -36,7 +37,7 @@ function EmployeeManagementContent() {
         <div className="min-h-[calc(100dvh-6rem)] rounded-xl border border-border-subtle/70 bg-dashboard-workspace dark:border-0 dark:bg-background sm:rounded-2xl">
             <div className="min-w-0 space-y-8 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] md:p-8 md:pb-[calc(2rem+env(safe-area-inset-bottom))]">
                 <header className="flex min-w-0 flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                    <div className="min-w-0 space-y-1">
+                    <WorkspaceHeading asset="employee-management" className="min-w-0 space-y-1">
                         <h1
                             data-page-heading
                             tabIndex={-1}
@@ -49,7 +50,7 @@ function EmployeeManagementContent() {
                                 ? "ดูแลข้อมูลบุคลากรภายในองค์กร"
                                 : "ดูข้อมูลพนักงานในองค์กร"}
                         </p>
-                    </div>
+                    </WorkspaceHeading>
                     {(employeeCapabilities?.canImportEmployees === true
                         || employeeCapabilities?.canCreateEmployees === true) && (
                         <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto lg:justify-end">

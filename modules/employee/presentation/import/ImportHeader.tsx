@@ -1,3 +1,4 @@
+import { WorkspaceHeading } from "@/components/ui/workspace-heading";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { type ImportHeaderProps } from "./types";
@@ -5,7 +6,7 @@ import { type ImportHeaderProps } from "./types";
 export function ImportHeader({ onBack }: ImportHeaderProps) {
     return (
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <div className="min-w-0 space-y-1">
+            <WorkspaceHeading asset="import-employee" className="min-w-0 space-y-1">
                 <h1
                     data-page-heading
                     tabIndex={-1}
@@ -16,7 +17,7 @@ export function ImportHeader({ onBack }: ImportHeaderProps) {
                 <p className="text-sm font-medium leading-6 text-content-secondary [overflow-wrap:anywhere]">
                     อัปโหลดไฟล์ CSV เพื่อเพิ่มข้อมูลพนักงานหลายคนพร้อมกัน
                 </p>
-            </div>
+            </WorkspaceHeading>
             {onBack && (
                 <Button
                     variant="outline"
