@@ -178,6 +178,9 @@ export async function checkWorkspaceHeaders(browser, origin) {
                         // Two full-width actions account for the same space; border and text metrics may differ.
                         assert.ok(Math.abs(before.content.y - ready.content.y) <= 8, "Employee action placeholders match the loaded row count");
                     }
+                    if (asset === "employee-management" && width >= 1024) {
+                        assert.ok(Math.abs(before.slot.y - ready.slot.y) <= 2, "Employee placeholder actions stay on one desktop row");
+                    }
                     measurements.push({ width, theme, asset, loading: before, ready });
                 }
                 if (width === 390 || width === 320) {

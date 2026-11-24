@@ -136,7 +136,7 @@ export function EmployeeManagementSectionSkeleton(): ReactElement {
             <div className="min-w-0 space-y-8 p-4 md:p-8">
                 <div className="flex min-w-0 flex-col justify-between gap-4 lg:flex-row lg:items-center">
                     <AdministrativeHeadingSkeleton />
-                    <div className="flex w-full flex-wrap gap-3 lg:w-auto lg:justify-end">
+                    <div className="flex w-full flex-wrap gap-3 lg:w-auto lg:shrink-0 lg:justify-end">
                         {Array.from({ length: 2 }).map((_, index) => (
                             <Skeleton
                                 key={index}
