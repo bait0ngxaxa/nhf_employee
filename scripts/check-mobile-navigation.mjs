@@ -372,6 +372,7 @@ try {
                         page.once("dialog", dialog => dialog.accept());
                         await page.getByRole("link", { name: "หน้าแรก", exact: true }).click();
                         await page.waitForURL("**/dashboard");
+                        await waitForLinkedCard(page);
                         await page.goBack();
                         await page.waitForURL("**/dashboard/it?itTab=queue");
                         assert.equal(await page.getByRole("link", { name: "เพิ่มเติม", exact: true }).getAttribute("aria-current"), "page");
