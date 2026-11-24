@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { mkdtemp, readFile, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import postcss from "postcss";
@@ -51,7 +51,9 @@ const bundle = await build({
     },
     outfile: join(output, "fixture.js"), bundle: true, write: false, format: "iife", jsx: "automatic",
     define: { "process.env.NODE_ENV": '"production"', "process.env.NEXT_PUBLIC_FEATURE_LEAVE": '"false"', "process.env.NEXT_PUBLIC_FEATURE_ROUTINE": '"false"' },
-    loader: { ".png": "dataurl" },
+    loader: { ".png": "dataurl", ".svg": "file" },
+    assetNames: "_next/static/media/[name]",
+    publicPath: "/",
     plugins: [{ name: "fixture-boundaries", setup(context) {
         context.onResolve({ filter: /^next\/(navigation|link|image|dynamic)$/ }, ({ path }) => ({ path, namespace: "fixture" }));
         context.onResolve({ filter: /^@\/components\/dashboard\/context$/ }, () => ({ path: resolve("components/dashboard/context/dashboard/DashboardContext.tsx") }));
@@ -92,12 +94,16 @@ const bundle = await build({
 });
 const css = await postcss([tailwind()]).process(await readFile("app/globals.css", "utf8"), { from: resolve("app/globals.css") });
 await writeFile(join(output, "fixture.js"), bundle.outputFiles.find(file => file.path.endsWith(".js")).contents);
+const moduleFiles = new Map(bundle.outputFiles
+    .filter((file) => file.path.endsWith(".svg"))
+    .map((file) => [`/${relative(output, file.path).replaceAll("\\", "/")}`, file.contents]));
 const html = `<!doctype html><html lang="th"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><style>${css.css}\n${bundle.outputFiles.find(file => file.path.endsWith(".css"))?.text ?? ""}</style><body style="font-family:'Noto Sans Thai',sans-serif"><div id="root"></div><script src="/fixture.js"></script></body></html>`;
 const server = createServer(async (req, res) => {
     if (req.url === "/fixture.js") { res.setHeader("Content-Type", "text/javascript"); res.end(await readFile(join(output, "fixture.js"))); return; }
-    if (/^\/assets\/modules\/(?:stock|leave|routine|it-ticket)(?:-compact)?\.svg$/.test(req.url)) {
+    const svg = moduleFiles.get(req.url);
+    if (svg) {
         res.setHeader("Content-Type", "image/svg+xml");
-        res.end(await readFile(join("public", req.url)));
+        res.end(svg);
         return;
     }
     if (req.url?.startsWith("/api/")) { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify({ status: "linked" })); return; }
@@ -110,8 +116,8 @@ assert.ok(address && typeof address === "object");
 const origin = `http://127.0.0.1:${address.port}`;
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(resolve(process.env.PLAYWRIGHT_MODULE)).href : "playwright");
 const browser = await chromium.launch({ executablePath: process.env.MOBILE_NAV_BROWSER_PATH || undefined, headless: true });
-const assetSelector = 'img[src^="/assets/modules/"]';
-const expectedAssets = ["stock", "leave", "routine", "it-ticket"].map((id) => `/assets/modules/${id}.svg`);
+const assetSelector = 'img[src^="/_next/static/media/"][src$=".svg"]';
+const expectedAssets = ["stock", "leave", "routine", "it-ticket"].map((id) => `/_next/static/media/${id}.svg`);
 
 async function checkArtwork(scope, expected) {
     const images = scope.locator(`${assetSelector}:visible`);

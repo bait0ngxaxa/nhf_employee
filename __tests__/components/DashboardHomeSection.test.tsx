@@ -12,6 +12,7 @@ import { getAvailableMenuGroups } from "@/constants/dashboard";
 import { getCurrentGreeting } from "@/components/dashboard/sections/DashboardGreeting";
 import type { MenuGroup } from "@/types/dashboard";
 import { DASHBOARD_MENU_GROUPS } from "@/constants/dashboard";
+import { VISUAL_ASSETS } from "@/lib/ui/visual-assets";
 
 vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
     useDashboardDataContext: vi.fn(),
@@ -179,17 +180,19 @@ describe("compact NHF quick actions", () => {
         const grid = screen.getByRole("region", { name: "เมนูด่วน" });
         const buttons = within(grid).getAllByRole("button");
         expect(buttons.map((button) => button.textContent)).toEqual(["เบิกวัสดุ", "วันลา", "งานประจำ", "บริการ IT"]);
-        const artworkPath = (button: HTMLElement) => {
+        const artworkSource = (button: HTMLElement) => {
             const image = button.querySelector("img");
             expect(image).toHaveAttribute("alt", "");
-            return image && new URL(image.src).pathname;
+            return image?.src;
         };
-        const expectedArtwork = ["stock", "leave", "routine", "it-ticket"].map((id) => `/assets/modules/${id}.svg`);
-        expect(buttons.map(artworkPath)).toEqual(expectedArtwork);
+        const expectedArtwork = (["stock", "leave", "routine", "it-ticket"] as const).map(
+            (asset) => new URL(VISUAL_ASSETS[asset].src, document.baseURI).href,
+        );
+        expect(buttons.map(artworkSource)).toEqual(expectedArtwork);
         const desktopButtons = [/NHF Stock/, /NHF Leave/, /NHF Routine/, /NHF IT-TICKET/].map(
             (name) => screen.getByRole("button", { name }),
         );
-        expect(desktopButtons.map(artworkPath)).toEqual(expectedArtwork);
+        expect(desktopButtons.map(artworkSource)).toEqual(expectedArtwork);
         for (const button of buttons) {
             expect(button).toHaveClass("bg-transparent", "focus-visible:ring-2");
             expect(button.querySelector("[data-shortcut-label]")?.parentElement).toBe(button);

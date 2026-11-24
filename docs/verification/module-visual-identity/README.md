@@ -37,6 +37,15 @@ node scripts/check-mobile-navigation.mjs
 npm run test -- __tests__/components/BrandAsset.test.tsx __tests__/components/DashboardHomeSection.test.tsx __tests__/components/LiffHome.test.tsx __tests__/components/DashboardSidebar.test.tsx __tests__/components/DashboardMobileNavigation.test.tsx __tests__/components/LiffNavigation.test.tsx __tests__/constants/dashboard-menu.test.ts __tests__/lib/dashboard-mobile-navigation.test.ts __tests__/lib/liff-home.test.ts __tests__/dashboard-route-access.test.ts
 ```
 
+## Production asset delivery
+
+The source SVGs stay in `public/assets/modules/`. The registry uses static imports so Next.js serves the artwork through its existing `/_next/static/media/` paths. Both Dashboard and LINE LIFF can load this artwork. The smoke check launches the production build on loopback, requests all eight generated SVGs without a session, and verifies the existing Dashboard login redirect.
+
+```powershell
+npm run build
+node scripts/check-module-asset-delivery.mjs
+```
+
 ## Verification boundaries
 
 The captures establish rendered component behavior under the fixture data. Authenticated App Router hydration, physical-device safe-area behavior, screen-reader operation, and LINE sign-in and account linking remain unverified. The fixture leaves production authentication intact and uses synthetic server-boundary inputs. Server authorization evidence comes from separate focused route and capability tests.

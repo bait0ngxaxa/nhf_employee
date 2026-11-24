@@ -23,6 +23,7 @@ vi.mock("@/modules/line/client", () => ({
 }));
 
 import { LiffHomeApp } from "@/components/liff/home/LiffHomeApp";
+import { VISUAL_ASSETS } from "@/lib/ui/visual-assets";
 
 const HOME = {
     workforce: {
@@ -158,7 +159,7 @@ describe("LIFF home", () => {
             expect(shortcut?.className).not.toMatch(/\b(?:border|shadow|bg-module)-/);
             expect(shortcut?.children).toHaveLength(2);
             expect(artwork?.parentElement).toBe(shortcut);
-            expect(image && new URL(image.src).pathname).toBe(`/assets/modules/${asset}.svg`);
+            expect(image?.src).toBe(new URL(VISUAL_ASSETS[asset].src, document.baseURI).href);
             expect(image).toHaveAttribute("alt", "");
             expect(label?.parentElement).toBe(shortcut);
             expect(label).toHaveClass("line-clamp-2", "h-10");

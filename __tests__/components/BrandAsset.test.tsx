@@ -12,15 +12,16 @@ describe("BrandAsset", () => {
         expect(Object.keys(VISUAL_ASSETS).sort()).toEqual(["it-ticket", "leave", "routine", "stock"]);
         const sources = new Set<string>();
 
-        for (const { src, compactSrc, fallback } of Object.values(VISUAL_ASSETS)) {
+        for (const [id, { src, compactSrc, fallback }] of Object.entries(VISUAL_ASSETS)) {
             expect(fallback).toBeDefined();
-            for (const path of [src, compactSrc]) {
-                expect(path).toMatch(/^\/assets\/modules\/[a-z-]+\.svg$/);
-                const svg = readFileSync(join(process.cwd(), "public", path), "utf8");
+            for (const suffix of ["", "-compact"]) {
+                const source = suffix ? compactSrc : src;
+                const svg = readFileSync(join(process.cwd(), "public", "assets", "modules", `${id}${suffix}.svg`), "utf8");
                 expect(svg).toContain('viewBox="0 0 128 128"');
                 expect(Buffer.byteLength(svg)).toBeLessThanOrEqual(15 * 1024);
-                expect(sources.has(path)).toBe(false);
-                sources.add(path);
+                expect(source).not.toBe("");
+                expect(sources.has(source)).toBe(false);
+                sources.add(source);
             }
         }
     });
@@ -29,7 +30,7 @@ describe("BrandAsset", () => {
         const { container } = render(<BrandAsset asset="leave" />);
         const image = container.querySelector("img");
         if (!image) throw new Error("Missing primary image");
-        expect(new URL(image.src).pathname).toBe(VISUAL_ASSETS.leave.src);
+        expect(image.src).toBe(new URL(VISUAL_ASSETS.leave.src, document.baseURI).href);
         expect(image).toHaveAttribute("width", "64");
         expect(image).toHaveAttribute("height", "64");
         expect(image).toHaveAttribute("alt", "");
@@ -44,7 +45,7 @@ describe("BrandAsset", () => {
         const { rerender } = render(<BrandAsset asset="routine" variant="compact" size="sm" alt="Routine" />);
         const image = screen.getByRole<HTMLImageElement>("img", { name: "Routine" });
         const box = image.parentElement;
-        expect(new URL(image.src).pathname).toBe(VISUAL_ASSETS.routine.compactSrc);
+        expect(image.src).toBe(new URL(VISUAL_ASSETS.routine.compactSrc, document.baseURI).href);
         expect(image).toHaveAttribute("width", "24");
 
         fireEvent.error(image);
@@ -53,6 +54,8 @@ describe("BrandAsset", () => {
         expect(fallback.parentElement).toBe(box);
 
         rerender(<BrandAsset asset="routine" size="sm" alt="Routine" />);
-        expect(new URL(screen.getByRole<HTMLImageElement>("img", { name: "Routine" }).src).pathname).toBe(VISUAL_ASSETS.routine.src);
+        expect(screen.getByRole<HTMLImageElement>("img", { name: "Routine" }).src).toBe(
+            new URL(VISUAL_ASSETS.routine.src, document.baseURI).href,
+        );
     });
 });
