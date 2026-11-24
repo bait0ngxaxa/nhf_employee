@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 
 import { ErrorState, LoadingState } from "@/components/ui/state";
+import { WorkspaceHeading } from "@/components/ui/workspace-heading";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     cancelLiffLeave,
@@ -679,7 +680,10 @@ export function LiffLeaveApp(): ReactElement {
                             </TabsContent>
                         ) : null}
                         {showApprovalTab ? (
-                            <TabsContent value="approvals" className="mt-5">
+                            <TabsContent value="approvals" className="mt-5 space-y-4">
+                                <WorkspaceHeading asset="leave" size="liff">
+                                    <h1 className="text-2xl font-bold tracking-tight text-content-heading">Leave</h1>
+                                </WorkspaceHeading>
                                 {approvalError ? (
                                     <ErrorState
                                         title="โหลดรายการรอพิจารณาไม่สำเร็จ"

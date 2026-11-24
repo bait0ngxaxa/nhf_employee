@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceHeading } from "@/components/ui/workspace-heading";
 import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import {
@@ -648,14 +649,14 @@ export function LiffRoutineApp(): ReactElement {
             >
                 <div className="mx-auto w-full max-w-lg space-y-5">
                     <header className="flex flex-col gap-4 border-b border-border-subtle pb-5 min-[420px]:flex-row min-[420px]:items-end min-[420px]:justify-between">
-                        <div className="space-y-1">
+                        <WorkspaceHeading asset="routine" size="liff" className="space-y-1">
                             <h1 className="text-2xl font-bold tracking-tight text-content-heading sm:text-3xl">
                                 งาน Routine ของฉัน
                             </h1>
                             <p className="text-sm leading-6 text-content-secondary">
                                 ดูงานที่ได้รับมอบหมายและกำหนดส่งของคุณ
                             </p>
-                        </div>
+                        </WorkspaceHeading>
                         <LiffRoutineCreateCapabilitySession
                             key={`${routineReadAvailable && canCreateTasks ? "enabled" : "disabled"}`}
                             routineReadAvailable={routineReadAvailable}

@@ -2,6 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element -- Selected attachments use local object URLs for previews. */
 
+import { WorkspaceHeading } from "@/components/ui/workspace-heading";
 import {
     useEffect,
     useRef,
@@ -330,11 +331,13 @@ function LiffITTicketList(): ReactElement {
     };
 
     const listHeading = (
-        <header className="space-y-2">
-            <h1 className="text-2xl font-bold leading-tight tracking-tight text-content-heading">คำขอ IT ของฉัน</h1>
-            <p className="text-sm leading-6 text-content-secondary">
-                แจ้งปัญหาหรือขอความช่วยเหลือ แล้วติดตามความคืบหน้าได้ที่นี่
-            </p>
+        <header>
+            <WorkspaceHeading asset="it-ticket" size="liff" className="space-y-2">
+                <h1 className="text-2xl font-bold leading-tight tracking-tight text-content-heading">คำขอ IT ของฉัน</h1>
+                <p className="text-sm leading-6 text-content-secondary">
+                    แจ้งปัญหาหรือขอความช่วยเหลือ แล้วติดตามความคืบหน้าได้ที่นี่
+                </p>
+            </WorkspaceHeading>
         </header>
     );
 
