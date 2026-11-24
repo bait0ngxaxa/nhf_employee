@@ -12,7 +12,7 @@ Each job checks out without persistent credentials, installs Node **24.22.1 LTS*
 
 | Job ID / required check | Subsequent commands | Job budget |
 | --- | --- | --- |
-| `quality` / **Code Quality** | `npm run architecture:check`, `npm run lint:strict`, `npx --no-install next typegen`, `npm run typecheck` | 20 minutes |
+| `quality` / **Code Quality** | `npm run architecture:check`, `npm run lint:strict`, `npx --no-install next typegen`, `npm run typecheck`, `npm run line:richmenu:verify` | 20 minutes |
 | `unit` / **Unit Tests** | `npm run test` | 30 minutes |
 | `integration` / **Full MySQL Integration** | Docker diagnostics; `node scripts/run-mysql-integration-tests.mjs --verify-failure-cleanup`; `npm run test:integration:mysql`; always `node scripts/run-mysql-integration-tests.mjs --cleanup` | 60 minutes |
 | `build` / **Production Build** | `npm run build` | 30 minutes |

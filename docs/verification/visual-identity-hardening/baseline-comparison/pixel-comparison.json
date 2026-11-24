@@ -1,0 +1,150 @@
+[
+  {
+    "file": "1440-sidebar-expanded-light.png",
+    "width": 1440,
+    "height": 900,
+    "differentPixels": 0,
+    "changedBounds": null,
+    "expected": "same ready-state appearance"
+  },
+  {
+    "file": "1440-sidebar-collapsed-dark.png",
+    "width": 1440,
+    "height": 900,
+    "differentPixels": 0,
+    "changedBounds": null,
+    "expected": "same ready-state appearance"
+  },
+  {
+    "file": "390-dashboard-nav-light.png",
+    "width": 390,
+    "height": 900,
+    "differentPixels": 0,
+    "changedBounds": null,
+    "expected": "same ready-state appearance"
+  },
+  {
+    "file": "390-liff-nav-dark.png",
+    "width": 390,
+    "height": 900,
+    "differentPixels": 0,
+    "changedBounds": null,
+    "expected": "same ready-state appearance"
+  },
+  {
+    "file": "390-liff-nav-home-light.png",
+    "width": 390,
+    "height": 900,
+    "differentPixels": 0,
+    "changedBounds": null,
+    "expected": "same ready-state appearance"
+  },
+  {
+    "file": "390-liff-nav-nested-light.png",
+    "width": 390,
+    "height": 900,
+    "differentPixels": 0,
+    "changedBounds": null,
+    "expected": "same ready-state appearance"
+  },
+  {
+    "file": "1440-dashboard-menu-light.png",
+    "width": 1440,
+    "height": 900,
+    "differentPixels": 0,
+    "changedBounds": null,
+    "expected": "same ready-state appearance"
+  },
+  {
+    "file": "390-more-dark.png",
+    "width": 390,
+    "height": 1300,
+    "differentPixels": 0,
+    "changedBounds": null,
+    "expected": "same ready-state appearance"
+  },
+  {
+    "file": "390-dashboard-nav-admin-only-light.png",
+    "width": 390,
+    "height": 900,
+    "differentPixels": 1460,
+    "changedBounds": {
+      "left": 87,
+      "top": 864,
+      "right": 301,
+      "bottom": 879
+    },
+    "expected": "short labels"
+  },
+  {
+    "file": "390-dashboard-nav-fallback-dark.png",
+    "width": 390,
+    "height": 900,
+    "differentPixels": 236,
+    "changedBounds": {
+      "left": 185,
+      "top": 839,
+      "right": 203,
+      "bottom": 856
+    },
+    "expected": "fallback glyph"
+  },
+  {
+    "file": "1440-sidebar-fallback-light.png",
+    "width": 1440,
+    "height": 900,
+    "differentPixels": 239,
+    "changedBounds": {
+      "left": 30,
+      "top": 197,
+      "right": 48,
+      "bottom": 214
+    },
+    "expected": "fallback glyph"
+  },
+  {
+    "file": "1440-dashboard-it-analytics-light.png",
+    "width": 1440,
+    "height": 900,
+    "differentPixels": 0,
+    "changedBounds": null,
+    "expected": "same ready-state appearance"
+  },
+  {
+    "file": "1440-dashboard-it-analytics-dark.png",
+    "width": 1440,
+    "height": 900,
+    "differentPixels": 0,
+    "changedBounds": null,
+    "expected": "same ready-state appearance"
+  },
+  {
+    "file": "390-dashboard-routine-light.png",
+    "width": 390,
+    "height": 850,
+    "differentPixels": 0,
+    "changedBounds": null,
+    "expected": "same ready-state appearance"
+  },
+  {
+    "file": "390-liff-stock-request-dark.png",
+    "width": 390,
+    "height": 850,
+    "differentPixels": 0,
+    "changedBounds": null,
+    "expected": "same ready-state appearance"
+  },
+  {
+    "file": "390-liff-routine-fallback-light.png",
+    "width": 390,
+    "height": 850,
+    "differentPixels": 248,
+    "changedBounds": {
+      "left": 24,
+      "top": 87,
+      "right": 39,
+      "bottom": 106
+    },
+    "expected": "fallback glyph"
+  }
+]
