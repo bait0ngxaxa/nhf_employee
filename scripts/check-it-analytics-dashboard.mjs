@@ -27,8 +27,11 @@ const linkShim = {
             loader: "jsx", resolveDir: process.cwd(),
         }));
         context.onResolve({ filter: /^next\/link$/ }, () => ({ path: "next-link", namespace: "shim" }));
-        context.onLoad({ filter: /.*/, namespace: "shim" }, () => ({
-            contents: `import React from "react";
+        context.onResolve({ filter: /^next\/image$/ }, () => ({ path: "next-image", namespace: "shim" }));
+        context.onLoad({ filter: /.*/, namespace: "shim" }, ({ path }) => ({
+            contents: path === "next-image"
+                ? `export default function Image({ unoptimized, ...props }) { return <img {...props} />; }`
+                : `import React from "react";
                 export default function Link({ href, children, ...props }) {
                     return React.createElement("a", { href, ...props }, children);
                 }`,
@@ -122,6 +125,7 @@ const bundle = await build({
         resolveDir: process.cwd(), loader: "tsx",
     },
     bundle: true, write: false, jsx: "automatic", plugins: [linkShim],
+    loader: { ".svg": "dataurl" },
     define: { "process.env.NODE_ENV": "\"production\"" },
 });
 const css = await postcss([tailwind()]).process(await readFile("app/globals.css", "utf8"), {

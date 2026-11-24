@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import postcss from "postcss";
 import tailwind from "@tailwindcss/postcss";
+import { checkWorkspaceHeaders } from "./fixtures/check-workspace-headers.mjs";
 
 // Real components + project CSS; fixture identity, API status and App Router adapters.
 // This checks rendered layout/interactions, not authentication, RSC or real-device E2E.
@@ -14,6 +15,7 @@ const output = await mkdtemp(join(tmpdir(), "nhf-mobile-navigation-"));
 const screenshots = process.env.MOBILE_NAV_SCREENSHOT_DIR;
 const menuScreenshots = process.env.MENU_IDENTITY_SCREENSHOT_DIR;
 const navigationScreenshots = process.env.NAVIGATION_IDENTITY_SCREENSHOT_DIR;
+const workspaceHeaders = process.argv.includes("--workspace-headers");
 if (screenshots) await mkdir(screenshots, { recursive: true });
 if (menuScreenshots) await mkdir(menuScreenshots, { recursive: true });
 if (navigationScreenshots) await mkdir(navigationScreenshots, { recursive: true });
@@ -21,6 +23,7 @@ const bundle = await build({
     stdin: {
         resolveDir: process.cwd(), loader: "tsx",
         contents: `import React, { useState, useSyncExternalStore } from "react";
+            ${workspaceHeaders ? 'import { DashboardWorkspace, LiffWorkspace, workspaceCapabilities } from "./scripts/fixtures/workspace-headers.jsx"; import { SWRProvider } from "./components/providers/SWRProvider";' : ""}
             import { createRoot } from "react-dom/client";
             import { DashboardDataContext, DashboardUIContext } from "./components/dashboard/context/dashboard/DashboardContext";
             import { DashboardLayoutClient } from "./components/dashboard/layout/DashboardLayoutClient";
@@ -61,8 +64,10 @@ const bundle = await build({
                     id: "employee-import", label: "นำเข้าข้อมูล",
                     items: [DASHBOARD_MENU_ITEMS.find(item => item.id === "import-employee")],
                 }];
-                const user = { id: "fixture", name: "พนักงาน ทดสอบ", email: "fixture@example.test", role: isAdmin ? "ADMIN" : "USER", teams: [{ id: 1, name: "NHF" }], department: "NHF", employeeCapabilities };
+                const user = { id: "fixture", name: "พนักงาน ทดสอบ", email: "fixture@example.test", role: isAdmin ? "ADMIN" : "USER", teams: [{ id: 1, name: "NHF" }], department: "NHF", employeeCapabilities${workspaceHeaders ? ", ...workspaceCapabilities(variant)" : ""} };
                 const ui = { selectedMenu: getDashboardMenuIdFromPathname(pathname), mobileNavOpen: false, setMobileNavOpen() {}, desktopSidebarCollapsed: collapsed, setDesktopSidebarCollapsed: setCollapsed, router, handleMenuClick: id => router.push(toDashboardMenuPath(id)), handleSignOut: async () => setSignedOut(true) };
+                ${workspaceHeaders ? `if (pathname.startsWith("/liff")) return <LiffAppShell><LiffWorkspace pathname={pathname} /></LiffAppShell>;
+                return <SWRProvider><DashboardDataContext.Provider value={{status: "authenticated", user, isAdmin, availableMenuGroups: groups}}><DashboardUIContext.Provider value={ui}><DashboardLayoutClient><DashboardWorkspace pathname={pathname} variant={variant} /></DashboardLayoutClient></DashboardUIContext.Provider></DashboardDataContext.Provider></SWRProvider>;` : ""}
                 if (pathname === "/liff") return <LiffAppShell><LiffHomeApp /></LiffAppShell>;
                 if (pathname.startsWith("/liff")) return <LiffAppShell><main id="main" className="p-4"><h1>บริการผ่าน LINE</h1><div style={{height: "100vh"}}>เนื้อหาทดสอบ</div></main></LiffAppShell>;
                 return <DashboardDataContext.Provider value={{status: "authenticated", user, isAdmin, availableMenuGroups: groups}}><DashboardUIContext.Provider value={ui}><DashboardLayoutClient>{signedOut ? <h1>ออกจากระบบแล้ว (fixture)</h1> : pathname === "/dashboard/more" ? <DashboardMoreSection /> : pathname === "/dashboard" ? <DashboardHomeSection announcement={<AnnouncementTicker content={variant === "no-announcement" ? null : "ประกาศสำหรับพนักงาน NHF — ตรวจสอบข่าวสารก่อนเริ่มงาน"} />} /> : <section><h1 data-page-heading tabIndex={-1}>บริการทดสอบ</h1><form data-navigation-dirty="true"><textarea aria-label="ข้อความที่ยังไม่ได้บันทึก" defaultValue="ร่างข้อความ" /></form><div style={{ height: "110vh" }} /><div className="dashboard-floating-action fixed bottom-[calc(var(--dashboard-mobile-nav-height,0px)+1rem+env(safe-area-inset-bottom))] right-4 z-30"><button className="min-h-11 rounded-md bg-brand-solid p-3">บันทึก</button></div></section>}</DashboardLayoutClient></DashboardUIContext.Provider></DashboardDataContext.Provider>;
@@ -70,7 +75,7 @@ const bundle = await build({
             createRoot(document.getElementById("root")).render(<Fixture />);`,
     },
     outfile: join(output, "fixture.js"), bundle: true, write: false, format: "iife", jsx: "automatic",
-    define: { "process.env.NODE_ENV": '"production"', "process.env.NEXT_PUBLIC_FEATURE_LEAVE": '"false"', "process.env.NEXT_PUBLIC_FEATURE_ROUTINE": '"false"' },
+    define: { "process.env.NODE_ENV": '"production"', "process.env.NEXT_PUBLIC_FEATURE_LEAVE": '"false"', "process.env.NEXT_PUBLIC_FEATURE_ROUTINE": workspaceHeaders ? '"true"' : '"false"' },
     loader: { ".png": "dataurl", ".svg": "file" },
     assetNames: "_next/static/media/[name]",
     publicPath: "/",
@@ -79,7 +84,12 @@ const bundle = await build({
         context.onResolve({ filter: /^@\/components\/dashboard\/context$/ }, () => ({ path: resolve("components/dashboard/context/dashboard/DashboardContext.tsx") }));
         context.onResolve({ filter: /^@\/modules\/notification\/client$/ }, () => ({ path: "notifications", namespace: "fixture" }));
         context.onResolve({ filter: /^@\/modules\/line\/client$/ }, ({ importer }) =>
-            importer === resolve("components/liff/home/LiffHomeApp.tsx") ? { path: "line", namespace: "fixture" } : undefined);
+            workspaceHeaders ? { path: "workspace-line", namespace: "fixture" }
+                : importer === resolve("components/liff/home/LiffHomeApp.tsx") ? { path: "line", namespace: "fixture" } : undefined);
+        if (workspaceHeaders) {
+            context.onResolve({ filter: /^@\/app\/_lib\/auth\/current-user$/ }, () => ({ path: "workspace-user", namespace: "fixture" }));
+            context.onResolve({ filter: /^@\/modules\/auth\/client$/ }, () => ({ path: "workspace-auth", namespace: "fixture" }));
+        }
         context.onLoad({ filter: /.*/, namespace: "fixture" }, ({ path }) => {
             const common = `import React, { useMemo, useState, useEffect, useSyncExternalStore } from "react";`;
             const sources = {
@@ -88,13 +98,21 @@ const bundle = await build({
                     const get = () => location.pathname + location.search;
                     const navigate = (method, href) => { history[method](null, "", href); dispatchEvent(new PopStateEvent("popstate")); };
                     const router = { push: href => navigate("pushState", href), replace: href => navigate("replaceState", href), refresh() {} };
+                    export const redirect = href => { throw new Error("Unexpected fixture redirect: " + href); };
                     export const useRouter = () => router;
                     export const usePathname = () => { useSyncExternalStore(subscribe, get); return location.pathname; };
                     export const useSearchParams = () => { const route = useSyncExternalStore(subscribe, get); return useMemo(() => new URLSearchParams(location.search), [route]); };`,
                 "next/link": `${common} export const useLinkStatus = () => ({pending:false}); export default function Link({href, children, onNavigate, prefetch, scroll, ...props}) { return <a {...props} href={href} onClick={event => { if(event.metaKey || event.ctrlKey) return; event.preventDefault(); let blocked = false; onNavigate?.({preventDefault: () => blocked = true}); if(!blocked) { history.pushState(null, "", href); dispatchEvent(new PopStateEvent("popstate")); } }}>{children}</a>; }`,
                 "next/image": `${common} export default function Image({src, priority, fill, quality, unoptimized, ...props}) { return <img {...props} src={typeof src === "string" ? src : src.src} />; }`,
-                "next/dynamic": `${common} export default function dynamic(load, options) { return function Dynamic(props) { const [Component, setComponent] = useState(null); useEffect(() => { load().then(module => setComponent(() => module.default)); }, []); return Component ? <Component {...props} /> : options?.loading?.() ?? null; }; }`,
+                "next/dynamic": `${common} export default function dynamic(load, options) { return function Dynamic(props) { const [Component, setComponent] = useState(null); useEffect(() => { load().then(module => setComponent(() => module.default ?? module)); }, []); return Component ? <Component {...props} /> : options?.loading?.() ?? null; }; }`,
                 notifications: `${common} export function NotificationDropdown() { return <button>การแจ้งเตือน</button>; }`,
+                "workspace-line": `export * from "./modules/line/presentation/liff-client";
+                    export { fetchLiffHome } from "./modules/line/presentation/liff-home-client";
+                    export const useLiffWorkforce = () => ({ userId: 10, employeeId: 20, name: "พนักงาน ทดสอบ" });`,
+                "workspace-user": `export const getCurrentUserProjection = async () => ({ id: "fixture" });`,
+                "workspace-auth": `export * from "./modules/auth/presentation/browser-transport";
+                    const user = { id: 10, employeeId: 20, role: "USER", stockCapabilities: { canReadCatalog: true, canReadOwnRequests: true } };
+                    export const useAuth = () => ({ user, status: "authenticated" });`,
                 line: `export class LiffApiError extends Error {}
                     const workforce = { userId: 10, employeeId: 20, name: "พนักงาน ทดสอบ" };
                     export const useLiffWorkforce = () => workforce;
@@ -206,8 +224,8 @@ async function captureMore(page, filename) {
 
 const waitForLinkedCard = (page) => page.getByText("เชื่อมบัญชี NHFapp กับ LINE แล้ว", { exact: true }).waitFor();
 
-let cases = 0;
-try {
+async function checkNavigation() {
+    let cases = 0;
     for (const width of (process.argv[2] ? [Number(process.argv[2])] : [320, 375, 390, 422, 768, 1024, 1440])) {
         for (const theme of ["light", "dark"]) {
             const page = await browser.newPage({ viewport: { width, height: 900 } });
@@ -597,8 +615,13 @@ try {
             await page.close();
         }
     }
+    process.stdout.write(`Mobile navigation rendered checks passed: ${cases} cases (Chromium fixture, not real-device E2E).\n`);
+}
+
+try {
+    if (workspaceHeaders) await checkWorkspaceHeaders(browser, origin);
+    else await checkNavigation();
 } finally {
     await browser.close();
     await new Promise((done) => server.close(done));
 }
-process.stdout.write(`Mobile navigation rendered checks passed: ${cases} cases (Chromium fixture, not real-device E2E).\n`);

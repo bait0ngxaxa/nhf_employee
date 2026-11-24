@@ -179,6 +179,9 @@ describe("LeaveManagementSection permissions", () => {
         const serverMarkup = renderToString(element);
         const container = document.createElement("div");
         container.innerHTML = serverMarkup;
+        // Compare the parsed DOM so HTML entity serialization in the image URL
+        // cannot masquerade as a hydration change.
+        const serverDOM = container.innerHTML;
         const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
         const root = hydrateRoot(container, element);
 
@@ -190,7 +193,7 @@ describe("LeaveManagementSection permissions", () => {
             call.some((value) => /hydration|did not match/i.test(String(value))),
         );
         expect(hydrationErrors).toHaveLength(0);
-        expect(container.innerHTML).toBe(serverMarkup);
+        expect(container.innerHTML).toBe(serverDOM);
         expect(container.querySelector("[data-testid='leave-tabs']"))
             .toHaveAttribute("data-active-tab", "reports");
 
