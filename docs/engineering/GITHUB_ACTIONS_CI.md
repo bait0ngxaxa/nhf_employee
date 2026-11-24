@@ -48,6 +48,8 @@ These are safeguards for trusted repository test tooling, not a sandbox against 
 
 Build initially uses no application secrets or synthetic application configuration and no extra heap limit. Prisma construction is lazy with respect to connecting; request-only validators remain unchanged. This workflow does not seed or contact a production database, invoke notification provisioning, disable authorization, or change feature flags. If hosted build exposes a configuration requirement, diagnose the exact failure and document any safe synthetic build-only value before adding it. No build output is deployed. Dependency/font downloads may need internet; this is not an offline build.
 
+The Production Build job also runs `node scripts/check-module-asset-delivery.mjs`. It starts the built server on an ephemeral loopback port, checks all module and menu SVGs in `/_next/static/media/` without a session, and checks the signed-out Dashboard redirect. The smoke process supplies a synthetic public origin and shuts down its local server on success or failure. It requires no database, application credentials, or browser.
+
 ## Local feedback and hosted evidence
 
 During development use affected tests, for example `npm run test -- __tests__/scripts/mysql-integration-safety.test.mjs`, targeted lint, and architecture/type checks as appropriate. Full local regression/build requires a documented exceptional reason under AGENTS.md; hosted CI is the default full gate. Docker is absent on the initial Windows workstation, so real lifecycle execution must be established on hosted CI, not inferred from mocks.

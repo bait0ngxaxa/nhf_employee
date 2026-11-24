@@ -5,7 +5,9 @@ import { useDashboardDataContext, useDashboardUIContext } from "@/components/das
 import { DashboardBottomNav } from "@/components/dashboard/layout/DashboardBottomNav";
 import { DashboardMoreSection } from "@/components/dashboard/sections/DashboardMoreSection";
 import { DashboardNavigationLink } from "@/components/dashboard/layout/DashboardNavigationLink";
-import { DASHBOARD_MENU_GROUPS } from "@/constants/dashboard";
+import { DASHBOARD_MENU_GROUPS, DASHBOARD_MENU_ITEMS } from "@/constants/dashboard";
+import { toDashboardMenuPath } from "@/lib/ssot/routes";
+import { VISUAL_ASSETS } from "@/lib/ui/visual-assets";
 import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
 
 function employeeCapabilities(
@@ -55,11 +57,69 @@ describe("browser mobile navigation", () => {
         expect(document.querySelector('a[href="/dashboard/employees/new"]')).toBeNull();
     });
 
+    it("renders compact identities in More without changing destination names or routes", () => {
+        const context = useDashboardDataContext();
+        vi.mocked(useDashboardDataContext).mockReturnValue({
+            ...context,
+            user: { id: "1", role: "ADMIN", employeeCapabilities: employeeCapabilities({ canImportEmployees: true }) },
+            isAdmin: true,
+            availableMenuGroups: DASHBOARD_MENU_GROUPS,
+        });
+        render(<DashboardMoreSection />);
+        const nav = screen.getByRole("navigation", { name: "เมนูเพิ่มเติม" });
+        const importItem = DASHBOARD_MENU_ITEMS.find((item) => item.id === "import-employee");
+        if (!importItem) throw new Error("Missing import destination");
+        const items = [...DASHBOARD_MENU_GROUPS.flatMap((group) => group.items), importItem];
+        expect(within(nav).getAllByRole("link").slice(0, items.length).map((link) => link.getAttribute("href")))
+            .toEqual(items.map((item) => toDashboardMenuPath(item.id)));
+        for (const item of items) {
+            if (!item.asset) throw new Error(`Missing visual asset for ${item.id}`);
+            const link = within(nav).getByRole("link", { name: item.sidebarLabel ?? item.label });
+            const image = link.querySelector("img");
+            expect(image?.src).toBe(new URL(VISUAL_ASSETS[item.asset].compactSrc, document.baseURI).href);
+            expect(image).toHaveAttribute("alt", "");
+            expect(image).toHaveAttribute("width", "24");
+        }
+        const importLink = within(nav).getByRole("link", { name: "นำเข้าจาก CSV" });
+        const image = importLink.querySelector("img");
+        if (!image) throw new Error("Missing import artwork");
+        fireEvent.error(image);
+        expect(importLink.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+        expect(importLink).toHaveAccessibleName("นำเข้าจาก CSV");
+        fireEvent.click(importLink);
+        expect(state.navigated).toHaveBeenCalledWith("/dashboard/employees/import");
+        const sessions = within(nav).getByRole("link", { name: "อุปกรณ์ที่เข้าสู่ระบบ" });
+        expect(sessions.querySelector("img")).toBeNull();
+        expect(sessions.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("keeps a single import entry when it is already projected and preserves More state labels", () => {
+        const importItem = DASHBOARD_MENU_ITEMS.find((item) => item.id === "import-employee");
+        if (!importItem) throw new Error("Missing import destination");
+        const [employee, addEmployee] = DASHBOARD_MENU_GROUPS[1].items;
+        vi.mocked(useDashboardDataContext).mockReturnValue({
+            status: "authenticated",
+            user: { id: "1", role: "USER", employeeCapabilities: employeeCapabilities({ canImportEmployees: true }) },
+            isAdmin: false,
+            availableMenuGroups: [{
+                ...DASHBOARD_MENU_GROUPS[1],
+                items: [importItem, { ...employee, unavailable: true }, { ...addEmployee, comingSoon: true }],
+            }],
+        });
+        render(<DashboardMoreSection />);
+        expect(screen.getAllByRole("link", { name: "นำเข้าจาก CSV" })).toHaveLength(1);
+        const unavailable = screen.getByRole("link", { name: /^ข้อมูลพนักงาน\s*ยังไม่พร้อมให้บริการ$/ });
+        expect(unavailable.querySelector("img")?.parentElement).toHaveClass("grayscale");
+        expect(screen.getByText("เร็วๆ นี้")).toBeVisible();
+        expect(screen.queryByRole("link", { name: /เพิ่มพนักงาน/ })).not.toBeInTheDocument();
+    });
+
     it("uses real browser destinations and follows route history and nested module paths", () => {
         const view = render(<DashboardBottomNav />);
         const nav = screen.getByRole("navigation");
         expect(nav).toHaveClass("lg:hidden");
         expect(within(nav).getAllByRole("link")).toHaveLength(5);
+        expect(nav.querySelector("img")).toBeNull();
         expect(screen.getByRole("link", { name: "หน้าแรก" })).toHaveAttribute("aria-current", "page");
         for (const pathname of ["/dashboard/routine", "/dashboard/stock", "/dashboard/leave", "/dashboard/routine"]) {
             state.pathname = pathname;

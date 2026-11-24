@@ -3,25 +3,50 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
+import {
+    Boxes, CalendarRange, ClipboardCheck, FileText, Headset, KeyRound,
+    Mail, Megaphone, Upload, UserPlus, Users,
+} from "lucide-react";
 import { describe, expect, it } from "vitest";
 import { BrandAsset } from "@/components/brand/BrandAsset";
 import { VISUAL_ASSETS } from "@/lib/ui/visual-assets";
 
+const svgSources = import.meta.glob<string>("/public/assets/{modules,menus}/*.svg", {
+    eager: true,
+    import: "default",
+    query: "?url",
+});
+
 describe("BrandAsset", () => {
-    it("ships a distinct pair of local SVGs and a fallback for each core identity", () => {
-        expect(Object.keys(VISUAL_ASSETS).sort()).toEqual(["it-ticket", "leave", "routine", "stock"]);
+    it("ships a distinct pair of local SVGs and the correct fallback for all eleven identities", () => {
+        const moduleFallbacks = { leave: CalendarRange, stock: Boxes, routine: ClipboardCheck, "it-ticket": Headset };
+        const menuFallbacks = {
+            "employee-management": Users,
+            "add-employee": UserPlus,
+            "import-employee": Upload,
+            "email-request": Mail,
+            announcements: Megaphone,
+            "authorization-administration": KeyRound,
+            "audit-logs": FileText,
+        };
+        const fallbacks = { ...moduleFallbacks, ...menuFallbacks };
+        expect(Object.keys(VISUAL_ASSETS).sort()).toEqual(Object.keys(fallbacks).sort());
         const sources = new Set<string>();
 
-        for (const [id, { src, compactSrc, fallback }] of Object.entries(VISUAL_ASSETS)) {
-            expect(fallback).toBeDefined();
-            for (const suffix of ["", "-compact"]) {
-                const source = suffix ? compactSrc : src;
-                const svg = readFileSync(join(process.cwd(), "public", "assets", "modules", `${id}${suffix}.svg`), "utf8");
-                expect(svg).toContain('viewBox="0 0 128 128"');
-                expect(Buffer.byteLength(svg)).toBeLessThanOrEqual(15 * 1024);
-                expect(source).not.toBe("");
-                expect(sources.has(source)).toBe(false);
-                sources.add(source);
+        for (const [folder, definitions] of [["modules", moduleFallbacks], ["menus", menuFallbacks]] as const) {
+            for (const id of Object.keys(definitions) as (keyof typeof VISUAL_ASSETS)[]) {
+                const { src, compactSrc, fallback } = VISUAL_ASSETS[id];
+                expect(fallback).toBe(fallbacks[id]);
+                for (const [suffix, source] of [["", src], ["-compact", compactSrc]]) {
+                    const filename = `${id}${suffix}.svg`;
+                    const svg = readFileSync(join(process.cwd(), "public", "assets", folder, filename), "utf8");
+                    expect(source).toBe(svgSources[`/public/assets/${folder}/${filename}`]);
+                    expect(svg).toContain('viewBox="0 0 128 128"');
+                    expect(Buffer.byteLength(svg)).toBeLessThanOrEqual(15 * 1024);
+                    expect(svg).not.toMatch(/<(?:image|script|text|filter|foreignObject)\b|\bhref=/i);
+                    expect(sources.has(source)).toBe(false);
+                    sources.add(source);
+                }
             }
         }
     });
@@ -42,20 +67,20 @@ describe("BrandAsset", () => {
     });
 
     it("preserves the informative name and box on failure and retries a changed source", () => {
-        const { rerender } = render(<BrandAsset asset="routine" variant="compact" size="sm" alt="Routine" />);
-        const image = screen.getByRole<HTMLImageElement>("img", { name: "Routine" });
+        const { rerender } = render(<BrandAsset asset="audit-logs" variant="compact" size="sm" alt="Audit logs" />);
+        const image = screen.getByRole<HTMLImageElement>("img", { name: "Audit logs" });
         const box = image.parentElement;
-        expect(image.src).toBe(new URL(VISUAL_ASSETS.routine.compactSrc, document.baseURI).href);
+        expect(image.src).toBe(new URL(VISUAL_ASSETS["audit-logs"].compactSrc, document.baseURI).href);
         expect(image).toHaveAttribute("width", "24");
 
         fireEvent.error(image);
-        const fallback = screen.getByRole("img", { name: "Routine" });
+        const fallback = screen.getByRole("img", { name: "Audit logs" });
         expect(fallback.tagName).toBe("svg");
         expect(fallback.parentElement).toBe(box);
 
-        rerender(<BrandAsset asset="routine" size="sm" alt="Routine" />);
-        expect(screen.getByRole<HTMLImageElement>("img", { name: "Routine" }).src).toBe(
-            new URL(VISUAL_ASSETS.routine.src, document.baseURI).href,
+        rerender(<BrandAsset asset="audit-logs" size="sm" alt="Audit logs" />);
+        expect(screen.getByRole<HTMLImageElement>("img", { name: "Audit logs" }).src).toBe(
+            new URL(VISUAL_ASSETS["audit-logs"].src, document.baseURI).href,
         );
     });
 });

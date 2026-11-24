@@ -216,8 +216,34 @@ describe("compact NHF quick actions", () => {
         expect(within(grid).getAllByRole("button")).toHaveLength(4);
         expect(within(grid).queryByText("จัดการสิทธิ์การใช้งาน")).not.toBeInTheDocument();
         expect(within(grid).queryByText(/ทั้งหมด|เพิ่มเติม/)).not.toBeInTheDocument();
-        // Secondary services remain in the unchanged desktop presentation.
         expect(screen.getByRole("button", { name: /จัดการสิทธิ์การใช้งาน/ })).toBeInTheDocument();
+    });
+
+    it("renders primary artwork on every projected administrative card and preserves click destinations", () => {
+        renderHome(DASHBOARD_MENU_GROUPS.slice(1));
+        const items = DASHBOARD_MENU_GROUPS.slice(1).flatMap((group) => group.items);
+        expect(screen.queryByRole("button", { name: /นำเข้าจาก CSV/ })).not.toBeInTheDocument();
+        for (const item of items) {
+            if (!item.asset) throw new Error(`Missing administrative asset for ${item.id}`);
+            const button = screen.getByRole("button", { name: `${item.label} ${item.description}` });
+            expect(button.querySelector("img")?.src).toBe(new URL(VISUAL_ASSETS[item.asset].src, document.baseURI).href);
+            expect(button.querySelector("img")).toHaveAttribute("alt", "");
+            expect(within(button).queryByRole("img")).not.toBeInTheDocument();
+            fireEvent.click(button);
+            expect(useDashboardUIContext().handleMenuClick).toHaveBeenLastCalledWith(item.id);
+        }
+    });
+
+    it("marks coming-soon artwork without activating the administrative destination", () => {
+        const group = DASHBOARD_MENU_GROUPS[1];
+        renderHome([{ ...group, items: [{ ...group.items[0], comingSoon: true }] }]);
+        const button = screen.getByRole("button", { name: /เร็วๆ นี้ ข้อมูลพนักงาน/ });
+        expect(button).toBeDisabled();
+        const image = button.querySelector("img");
+        expect(image?.src).toBe(new URL(VISUAL_ASSETS["employee-management"].src, document.baseURI).href);
+        expect(image?.parentElement).toHaveClass("grayscale");
+        fireEvent.click(button);
+        expect(useDashboardUIContext().handleMenuClick).not.toHaveBeenCalled();
     });
 
     it("uses only Stock and Routine for a limited capability set", () => {
@@ -225,6 +251,8 @@ describe("compact NHF quick actions", () => {
         renderHome([{ ...group, items: group.items.filter(item => ["stock", "routine"].includes(item.id)) }]);
         expect(within(screen.getByRole("region", { name: "เมนูด่วน" })).getAllByRole("button").map(button => button.textContent)).toEqual(["เบิกวัสดุ", "งานประจำ"]);
         expect(screen.queryByRole("button", { name: /NHF Leave|NHF IT-TICKET/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole("heading", { name: "บริการอื่นๆ" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /ข้อมูลพนักงาน|จัดการสิทธิ์การใช้งาน/ })).not.toBeInTheDocument();
     });
 
     it("does not substitute administrative services when no featured module is available", () => {

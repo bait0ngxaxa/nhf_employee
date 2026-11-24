@@ -14,6 +14,7 @@ import {
     normalizeLeaveDashboardTab,
 } from "@/constants/dashboard";
 import { isDashboardTabEnabled } from "@/lib/ssot/features";
+import { VISUAL_ASSETS } from "@/lib/ui/visual-assets";
 import type { LeavePresentationCapabilities } from "@/modules/leave/client";
 import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
@@ -24,6 +25,22 @@ import type { ITPresentationCapabilities } from "@/modules/it/client";
 
 const originalRoutineFlag = process.env.NEXT_PUBLIC_FEATURE_ROUTINE;
 const originalLeaveFlag = process.env.NEXT_PUBLIC_FEATURE_LEAVE;
+
+it.each([
+    "add-employee",
+    "announcements",
+    "audit-logs",
+    "authorization-administration",
+    "email-request",
+    "employee-management",
+    "import-employee",
+] as const)("maps %s to its matching identity and existing Lucide fallback", (id) => {
+    expect(DASHBOARD_MENU_ITEMS.find((item) => item.id === id)).toMatchObject({
+        id,
+        asset: id,
+        icon: VISUAL_ASSETS[id].fallback,
+    });
+});
 
 const routineCapabilities = {
     canReadTasks: true,
