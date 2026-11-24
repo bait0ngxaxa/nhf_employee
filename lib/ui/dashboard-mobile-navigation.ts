@@ -11,6 +11,7 @@ export interface DashboardMobileTab {
     label: string;
     href: string;
     icon: MenuItem["icon"];
+    asset?: MenuItem["asset"];
 }
 
 const PRIMARY_ORDER = ["routine", "stock", "leave-management", "it-workspace"] as const;
@@ -48,6 +49,7 @@ export function projectDashboardMobileTabs(groups: readonly MenuGroup[]): Dashbo
             label: SHORT_LABELS[item.id] ?? item.sidebarLabel ?? item.label,
             href: toDashboardMenuPath(item.id),
             icon: item.icon,
+            asset: item.asset,
         })),
         { id: "more", label: "เพิ่มเติม", href: APP_ROUTES.dashboardMore, icon: MoreHorizontal },
     ];
