@@ -314,6 +314,7 @@ https://liff.line.me/<LIFF_ID>/routine
 
 ```text
 assets/line/nhf-rich-menu.png
+scripts/generate-nhf-rich-menu.ts
 lib/line/rich-menu.ts
 scripts/line-rich-menu.ts
 ```
@@ -343,6 +344,15 @@ npm run line:richmenu:provision -- --apply
 | `provision -- --apply` | validate → create → upload → set default → GET verify; เปลี่ยน production state |
 
 `provision` อาจล้มด้วย missing local configuration ได้โดยไม่ใช่ product failure ต้องรันใน environment ที่ตั้งใจใช้งานและแก้ config ให้ครบ
+
+### ขั้นตอนเปลี่ยนภาพ Unified Rich Menu v1.5 สำหรับผู้ปฏิบัติงานที่ได้รับอนุญาต
+
+1. ยืนยัน Official Account และ Messaging API Channel เป้าหมายจาก LINE Developers Console และแหล่งจัดเก็บ secret ที่องค์กรอนุมัติ ใช้ไฟล์ `.env` เพื่อโหลดค่าตามขั้นตอนที่กำหนด และยืนยันตัวตนของช่องทางแยกต่างหาก เก็บ access token ไว้ใน secret store และงดแสดงค่าใน log หรือหลักฐานตรวจรับ
+2. รัน `npm run line:richmenu:status` แล้วบันทึก default Rich Menu ID ปัจจุบันในบันทึกการปฏิบัติงานที่จำกัดสิทธิ์ หากระบุ ID เดิมไม่ได้ สถานะกำกวม หรือเมนูจัดการจาก OA Manager ให้หยุดตรวจสอบกับเจ้าของช่องทาง และจัดทำขั้นตอนกู้คืนที่เหมาะกับระบบที่ใช้งานจริงก่อนขอเปิดใช้ภาพใหม่
+3. รัน `npm run line:richmenu:asset` แล้วรัน `npm run line:richmenu:provision` แบบ dry-run ตรวจภาพ ขนาด 2500 × 843px จำนวนไบต์ พื้นที่กดทั้งสี่ URL LIFF และสถานะโมดูล คำสั่งสร้างภาพทำงานกับไฟล์ในรีโป และ dry-run ตรวจแผนโดยไม่เรียก LINE API ดู [ภาพสำหรับตรวจรับ](../verification/rich-menu-visual-identity/README.md)
+4. ขออนุมัติภาพ ช่องทางเป้าหมาย default ID เดิม การจับคู่ปลายทาง และแผน rollback จากนั้นผู้ปฏิบัติงานที่ได้รับอนุญาตจึงรัน `npm run line:richmenu:provision -- --apply` ตาม launch gate ในคู่มือนี้ คำสั่งสร้างเมนู อัปโหลดภาพ ตั้ง default และตรวจผล หาก LINE ตอบกลับกำกวม ให้ตรวจสถานะก่อนดำเนินการครั้งถัดไป
+5. รัน `npm run line:richmenu:status` เพื่อยืนยัน default ID ใหม่ เปิดแชต LINE บนมือถืออีกครั้ง แล้วแตะทั้งสี่ช่อง ตรวจปลายทาง LIFF หน้าของโมดูลที่ยังไม่เปิดใช้ การเชื่อมบัญชี และสิทธิ์ผู้ใช้ เผื่อเวลาให้ค่า default เผยแพร่ไปยังแอป และตรวจว่าบัญชีทดสอบมี per-user Rich Menu ที่แสดงทับ default หรือไม่ เก็บการตั้งค่า per-user ตามเดิม [วิธีตั้ง default Rich Menu ของ LINE](https://developers.line.biz/en/docs/messaging-api/using-rich-menus/)
+6. เก็บเมนูเดิมไว้ระหว่างตรวจรับ หากต้องย้อนกลับ ใช้ dry-run ของ `set-default` กับ ID เดิมที่ยืนยันแล้วก่อนขออนุมัติ `--apply` ตามตัวอย่างด้านล่าง ตรวจสถานะที่คืนกลับและเปิดแชตบนมือถือเพื่อยืนยันภาพอีกครั้ง
 
 ### Rollback helper
 
