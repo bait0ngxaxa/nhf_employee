@@ -1,0 +1,11 @@
+{
+    "schemaVersion": 1,
+    "sourceFingerprint": "c70743b2d74798135b5bf3fdb12a6bd8d6f19fea8ee182410eff32b7b614f0f1",
+    "image": {
+        "sha256": "cba24c4810fba10139112c5dc0dd1a3963e47c06fff1499c23b13694fbc688cc",
+        "width": 2500,
+        "height": 843,
+        "bytes": 106175,
+        "format": "png"
+    }
+}
