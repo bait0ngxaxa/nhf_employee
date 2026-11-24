@@ -1,19 +1,21 @@
-import {
-    Boxes,
-    CalendarRange,
-    ClipboardCheck,
-    Headset,
-    House,
-} from "lucide-react";
+import { House, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactElement } from "react";
 
+import { BrandAsset } from "@/components/brand/BrandAsset";
+import type { VisualAssetKey } from "@/lib/ui/visual-assets";
 import { mobileNavigationItemClassName } from "@/lib/ui/mobile-navigation-styles";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 
 interface LiffBottomNavProps {
     pathname: string | null;
 }
+
+type LiffNavItem = {
+    key: string;
+    href: string;
+    label: string;
+} & ({ asset: VisualAssetKey } | { icon: LucideIcon });
 
 const NAV_ITEMS = [
     {
@@ -26,27 +28,27 @@ const NAV_ITEMS = [
         key: "stock",
         href: APP_ROUTES.line.stock,
         label: "วัสดุ",
-        icon: Boxes,
+        asset: "stock",
     },
     {
         key: "leave",
         href: APP_ROUTES.line.leave,
         label: "วันลา",
-        icon: CalendarRange,
+        asset: "leave",
     },
     {
         key: "routine",
         href: APP_ROUTES.line.routine,
         label: "งานประจำ",
-        icon: ClipboardCheck,
+        asset: "routine",
     },
     {
         key: "it",
         href: APP_ROUTES.line.it,
         label: "IT",
-        icon: Headset,
+        asset: "it-ticket",
     },
-] as const;
+] as const satisfies readonly LiffNavItem[];
 
 function getActiveNavKey(pathname: string | null): string | null {
     if (!pathname) return null;
@@ -73,7 +75,6 @@ export function LiffBottomNav({ pathname }: LiffBottomNavProps): ReactElement {
             <div className="grid grid-cols-5 gap-1">
                 {NAV_ITEMS.map((item) => {
                     const active = item.key === activeKey;
-                    const Icon = item.icon;
                     return (
                         <Link
                             key={item.key}
@@ -87,7 +88,13 @@ export function LiffBottomNav({ pathname }: LiffBottomNavProps): ReactElement {
                                     aria-hidden="true"
                                 />
                             ) : null}
-                            <Icon className="size-5" aria-hidden="true" />
+                            {"asset" in item ? (
+                                <BrandAsset asset={item.asset} variant="compact" size="sm" />
+                            ) : (
+                                <span className="grid size-6 shrink-0 place-items-center">
+                                    <item.icon className="size-5" aria-hidden="true" />
+                                </span>
+                            )}
                             <span className="truncate">{item.label}</span>
                         </Link>
                     );
