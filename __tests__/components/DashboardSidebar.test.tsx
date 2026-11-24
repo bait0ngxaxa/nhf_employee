@@ -9,6 +9,7 @@ import {
     DASHBOARD_MENU_GROUPS,
     getAvailableMenuGroups,
 } from "@/constants/dashboard";
+import { VISUAL_ASSETS } from "@/lib/ui/visual-assets";
 import { useExpandedSidebarGroups } from "@/components/dashboard/layout/DashboardSidebarPrimitives";
 
 vi.mock("@/components/dashboard/context/dashboard/DashboardContext", () => ({
@@ -116,6 +117,54 @@ describe("DashboardSidebar", () => {
         ).not.toBeInTheDocument();
     });
 
+    it.each([false, true])("renders compact artwork in the projected sidebar (collapsed=%s)", (collapsed) => {
+        mockSidebarContext(collapsed, DASHBOARD_MENU_GROUPS);
+        render(<DashboardSidebar />);
+
+        for (const item of DASHBOARD_MENU_GROUPS.flatMap((group) => group.items)) {
+            const button = screen.getByRole("button", { name: item.sidebarLabel ?? item.label });
+            if (!item.asset) {
+                expect(button.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+                continue;
+            }
+            const artwork = button.querySelector("img");
+            expect(artwork?.src).toBe(new URL(VISUAL_ASSETS[item.asset].compactSrc, document.baseURI).href);
+            expect(artwork).toHaveAttribute("alt", "");
+            expect(artwork).toHaveAttribute("width", "24");
+        }
+        const home = screen.getByRole("button", { name: "หน้าหลัก" });
+        expect(home.querySelector("img")).toBeNull();
+        expect(home.querySelector(".lucide-house")).toHaveAttribute("aria-hidden", "true");
+        expect(screen.queryByRole("button", { name: "นำเข้าจาก CSV" })).not.toBeInTheDocument();
+    });
+
+    it("keeps a collapsed destination named and actionable after artwork fails", () => {
+        mockSidebarContext(true);
+        render(<DashboardSidebar />);
+        const destination = screen.getByRole("button", { name: "ข้อมูลพนักงาน" });
+        const image = destination.querySelector("img");
+        if (!image) throw new Error("Missing employee artwork");
+        const artworkSlot = image.parentElement;
+        fireEvent.error(image);
+        expect(artworkSlot).toHaveClass("size-6");
+        expect(artworkSlot?.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+        expect(destination).toHaveAccessibleName("ข้อมูลพนักงาน");
+        fireEvent.click(destination);
+        expect(handleMenuClick).toHaveBeenCalledWith("employee-management");
+    });
+
+    it("keeps coming-soon artwork disabled and omits destinations outside the filtered groups", () => {
+        const group = DASHBOARD_MENU_GROUPS[0];
+        mockSidebarContext(true, [{ ...group, items: group.items.filter((item) => item.id === "stock").map((item) => ({ ...item, comingSoon: true })) }]);
+        render(<DashboardSidebar />);
+        const comingSoon = screen.getByRole("button", { name: "วัสดุและคลัง (เร็วๆ นี้)" });
+        expect(comingSoon).toBeDisabled();
+        expect(comingSoon.querySelector("img")?.parentElement).toHaveClass("grayscale");
+        fireEvent.click(comingSoon);
+        expect(handleMenuClick).not.toHaveBeenCalled();
+        expect(screen.queryByRole("button", { name: "ข้อมูลพนักงาน" })).not.toBeInTheDocument();
+    });
+
     it("shows the unavailable state and retains navigation in the sidebar", () => {
         vi.stubEnv("NEXT_PUBLIC_FEATURE_LEAVE", "false");
         try {
@@ -123,6 +172,7 @@ describe("DashboardSidebar", () => {
             render(<DashboardSidebar />);
             const item = screen.getByRole("button", { name: /การลา.*ยังไม่พร้อมให้บริการ/ });
             expect(item).toBeEnabled();
+            expect(item.querySelector("img")?.parentElement).toHaveClass("grayscale");
             fireEvent.click(item);
             expect(handleMenuClick).toHaveBeenCalledWith("leave-management");
         } finally {

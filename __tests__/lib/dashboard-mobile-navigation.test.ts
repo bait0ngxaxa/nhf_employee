@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Upload } from "lucide-react";
-import { getAvailableMenuGroups, DASHBOARD_MENU_GROUPS } from "@/constants/dashboard";
+import { getAvailableMenuGroups, DASHBOARD_MENU_GROUPS, DASHBOARD_MENU_ITEMS } from "@/constants/dashboard";
 import { projectDashboardMobileTabs, resolveDashboardMobileTab } from "@/lib/ui/dashboard-mobile-navigation";
 import type { EmployeePresentationCapabilities } from "@/modules/employee/client";
 
@@ -25,6 +25,7 @@ describe("Dashboard mobile navigation projection", () => {
     it("pins three eligible modules between Home and More", () => {
         const tabs = projectDashboardMobileTabs(DASHBOARD_MENU_GROUPS);
         expect(tabs.map((tab) => tab.id)).toEqual(["dashboard", "routine", "stock", "leave-management", "more"]);
+        expect(tabs.map((tab) => tab.asset)).toEqual([undefined, "routine", "stock", "leave", undefined]);
         expect(tabs.every((tab) => tab.href.startsWith("/dashboard"))).toBe(true);
     });
 
@@ -32,6 +33,21 @@ describe("Dashboard mobile navigation projection", () => {
         const groups = DASHBOARD_MENU_GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => item.id !== "routine") }));
         expect(projectDashboardMobileTabs(groups).map((tab) => tab.id)).toEqual(["dashboard", "stock", "leave-management", "it-workspace", "more"]);
         expect(projectDashboardMobileTabs([]).map((tab) => tab.id)).toEqual(["dashboard", "more"]);
+    });
+
+    it("carries secondary artwork from eligible items without promoting disabled entries", () => {
+        const group = DASHBOARD_MENU_GROUPS[1];
+        const items = group.items.map((item) => ({
+            ...item,
+            unavailable: item.id === "add-employee",
+            comingSoon: item.id === "email-request",
+        }));
+        const tabs = projectDashboardMobileTabs([{ ...group, items }]);
+        expect(tabs.map(({ id, asset }) => [id, asset])).toEqual([
+            ["dashboard", undefined],
+            ["employee-management", "employee-management"],
+            ["more", undefined],
+        ]);
     });
 
     it("never promotes Employee Import into the Bottom Navigation tabs", () => {
@@ -45,6 +61,7 @@ describe("Dashboard mobile navigation projection", () => {
                 sidebarLabel: "นำเข้าจาก CSV",
                 description: "นำเข้าข้อมูลพนักงานจากไฟล์ CSV",
                 icon: Upload,
+                asset: DASHBOARD_MENU_ITEMS.find((item) => item.id === "import-employee")?.asset,
             }],
         }];
         expect(projectDashboardMobileTabs(groups).map((tab) => tab.id)).toEqual(["dashboard", "more"]);

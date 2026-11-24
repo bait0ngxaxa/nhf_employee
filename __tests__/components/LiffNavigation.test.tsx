@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const usePathnameMock = vi.hoisted(() => vi.fn());
@@ -9,6 +9,7 @@ vi.mock("next/navigation", () => ({
 
 import { LiffAppShell } from "@/components/liff/LiffAppShell";
 import { APP_ROUTES } from "@/lib/ssot/routes";
+import { VISUAL_ASSETS } from "@/lib/ui/visual-assets";
 
 describe("LIFF application shell navigation", () => {
     beforeEach(() => {
@@ -53,6 +54,29 @@ describe("LIFF application shell navigation", () => {
         );
         expect(screen.getAllByRole("link")).toHaveLength(6);
         expect(screen.getAllByText("งานประจำ")).toHaveLength(2);
+    });
+
+    it("uses shared compact artwork and preserves names and destinations after fallback", () => {
+        render(<LiffAppShell><main>บริการ</main></LiffAppShell>);
+        const nav = within(screen.getByRole("navigation"));
+        const home = nav.getByRole("link", { name: "หน้าหลัก" });
+        expect(home.querySelector("img")).toBeNull();
+        expect(home.querySelector(".lucide-house")).toHaveAttribute("aria-hidden", "true");
+        for (const [label, key] of [["วัสดุ", "stock"], ["วันลา", "leave"], ["งานประจำ", "routine"], ["IT", "it-ticket"]] as const) {
+            const link = nav.getByRole("link", { name: label });
+            const artwork = link.querySelector("img");
+            if (!artwork) throw new Error(`Missing artwork for ${key}`);
+            expect(artwork.src).toBe(new URL(VISUAL_ASSETS[key].compactSrc, document.baseURI).href);
+            expect(artwork).toHaveAttribute("alt", "");
+            expect(artwork).toHaveAttribute("width", "24");
+        }
+        const it = nav.getByRole("link", { name: "IT" });
+        const artwork = it.querySelector("img");
+        if (!artwork) throw new Error("Missing IT artwork");
+        fireEvent.error(artwork);
+        expect(it.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+        expect(it).toHaveAccessibleName("IT");
+        expect(it).toHaveAttribute("href", APP_ROUTES.line.it);
     });
 
     it.each([
@@ -129,8 +153,8 @@ describe("LIFF application shell navigation", () => {
         expect(within(navigation).getAllByRole("link")).toHaveLength(5);
     });
 
-    it("renders an unknown LIFF path without selecting an unrelated module", () => {
-        usePathnameMock.mockReturnValue(`${APP_ROUTES.line.root}/invalid`);
+    it.each([null, `${APP_ROUTES.line.root}/invalid`])("renders %s without selecting an unrelated module", (pathname) => {
+        usePathnameMock.mockReturnValue(pathname);
 
         render(
             <LiffAppShell>

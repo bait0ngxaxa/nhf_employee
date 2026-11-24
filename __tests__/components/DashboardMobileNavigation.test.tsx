@@ -119,7 +119,17 @@ describe("browser mobile navigation", () => {
         const nav = screen.getByRole("navigation");
         expect(nav).toHaveClass("lg:hidden");
         expect(within(nav).getAllByRole("link")).toHaveLength(5);
-        expect(nav.querySelector("img")).toBeNull();
+        for (const [label, key] of [["งานประจำ", "routine"], ["วัสดุ", "stock"], ["วันลา", "leave"]] as const) {
+            const image = within(nav).getByRole("link", { name: label }).querySelector("img");
+            expect(image?.src).toBe(new URL(VISUAL_ASSETS[key].compactSrc, document.baseURI).href);
+            expect(image).toHaveAttribute("alt", "");
+            expect(image).toHaveAttribute("width", "24");
+        }
+        for (const label of ["หน้าแรก", "เพิ่มเติม"]) {
+            const link = within(nav).getByRole("link", { name: label });
+            expect(link.querySelector("img")).toBeNull();
+            expect(link.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+        }
         expect(screen.getByRole("link", { name: "หน้าแรก" })).toHaveAttribute("aria-current", "page");
         for (const pathname of ["/dashboard/routine", "/dashboard/stock", "/dashboard/leave", "/dashboard/routine"]) {
             state.pathname = pathname;
@@ -130,6 +140,21 @@ describe("browser mobile navigation", () => {
         state.pathname = "/dashboard/stock-other";
         view.rerender(<DashboardBottomNav />);
         expect(nav.querySelector('[aria-current="page"]')).toBeNull();
+    });
+
+    it("renders projected secondary artwork and retains guarded navigation after fallback", () => {
+        const context = useDashboardDataContext();
+        vi.mocked(useDashboardDataContext).mockReturnValue({ ...context, availableMenuGroups: DASHBOARD_MENU_GROUPS.slice(1) });
+        render(<DashboardBottomNav />);
+        const employee = screen.getByRole("link", { name: "ข้อมูลพนักงาน" });
+        const artwork = employee.querySelector("img");
+        if (!artwork) throw new Error("Missing employee artwork");
+        expect(artwork.src).toBe(new URL(VISUAL_ASSETS["employee-management"].compactSrc, document.baseURI).href);
+        fireEvent.error(artwork);
+        expect(employee.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+        expect(employee).toHaveAccessibleName("ข้อมูลพนักงาน");
+        fireEvent.click(employee);
+        expect(state.navigated).toHaveBeenCalledWith("/dashboard/employees");
     });
 
     it("updates More ownership for deep links, history and capability changes", () => {
