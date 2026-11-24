@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="face" x2="0.85" y2="1"><stop stop-color="#fff7ed"/><stop offset="1" stop-color="#fdba74"/></linearGradient>
+  </defs>
+  <path d="m18 37 43-18a8 8 0 0 1 6 0l43 18a7 7 0 0 1 4 7v41a7 7 0 0 1-4 7l-42 17a11 11 0 0 1-8 0L18 92a7 7 0 0 1-4-7V44a7 7 0 0 1 4-7Z" fill="#ea580c"/>
+  <path d="m16 40 44 19a11 11 0 0 0 8 0l44-19-45-21a8 8 0 0 0-6 0Z" fill="url(#face)"/>
+  <path d="m64 60 49-20 1 4v41a7 7 0 0 1-4 7l-46 18Z" fill="#9a3412"/>
+  <path d="m38 29 47 22v21l12-5V46L51 24Z" fill="#fff7ed"/>
+</svg>

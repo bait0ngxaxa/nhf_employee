@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="face" x2="0.85" y2="1"><stop stop-color="#fff7ed"/><stop offset="1" stop-color="#fdba74"/></linearGradient>
+    <linearGradient id="depth" x2="0.9" y2="1"><stop stop-color="#ea580c"/><stop offset="1" stop-color="#7c2d12"/></linearGradient>
+  </defs>
+  <path d="m56 19 20-7a8 8 0 0 1 6 0l22 9a7 7 0 0 1 4 6v32l-29 13-27-13V26a7 7 0 0 1 4-7Z" fill="url(#depth)"/>
+  <path d="m54 22 24-10a7 7 0 0 1 5 0l23 10-27 12Z" fill="#fdba74"/>
+  <path d="M79 34v28" stroke="#9a3412" stroke-width="2"/>
+  <path d="m18 49 43-16a8 8 0 0 1 6 0l43 16a7 7 0 0 1 4 7v37a7 7 0 0 1-4 7l-42 16a10 10 0 0 1-8 0l-42-16a7 7 0 0 1-4-7V56a7 7 0 0 1 4-7Z" fill="url(#depth)"/>
+  <path d="m16 52 44 18a11 11 0 0 0 8 0l44-18-45-19a8 8 0 0 0-6 0Z" fill="url(#face)"/>
+  <path d="M64 71v46l46-17a7 7 0 0 0 4-7V56l-2-4Z" fill="#c2410c"/>
+  <path d="m39 43 48 20v17l10-4V59L50 39Z" fill="#fff7ed"/>
+  <path d="m27 79 21 8m-21 2 13 5" stroke="#fff7ed" stroke-width="4" stroke-linecap="round"/>
+</svg>
