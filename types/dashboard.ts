@@ -1,5 +1,6 @@
 import { type ComponentType } from "react";
 import { type FeatureKey } from "@/lib/ssot/features";
+import type { VisualAssetKey } from "@/lib/ui/visual-assets";
 
 export interface MenuItem {
     id: string;
@@ -7,6 +8,7 @@ export interface MenuItem {
     /** Short task-oriented label used in the dashboard sidebar only. */
     sidebarLabel?: string;
     icon: ComponentType<{ className?: string }>;
+    asset?: VisualAssetKey;
     description: string;
     requiredRole?: "ADMIN";
     feature?: FeatureKey;

@@ -1,20 +1,17 @@
 import {
-    Boxes,
     Mail,
     Users,
     UserPlus,
     Upload,
-    CalendarRange,
     FileText,
     AppWindow,
     ShieldCheck,
-    ClipboardCheck,
     KeyRound,
-    Headset,
     Megaphone,
 } from "lucide-react";
 import { type MenuItem, type MenuGroup } from "@/types/dashboard";
 import { FEATURE_KEYS, isFeatureEnabled } from "@/lib/ssot/features";
+import { VISUAL_ASSETS } from "@/lib/ui/visual-assets";
 import type { RoutinePresentationCapabilities } from "@/modules/routine/client";
 import type { StockPresentationCapabilities } from "@/modules/stock/client";
 import type { LeavePresentationCapabilities } from "@/modules/leave/client";
@@ -34,7 +31,8 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         id: "leave-management",
         label: "NHF Leave",
         sidebarLabel: "การลา",
-        icon: CalendarRange,
+        asset: "leave",
+        icon: VISUAL_ASSETS.leave.fallback,
         description: "ยื่นใบลาและตรวจสอบโควต้าวันลา",
         feature: FEATURE_KEYS.leave,
     },
@@ -42,14 +40,16 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         id: "stock",
         label: "NHF Stock",
         sidebarLabel: "วัสดุและคลัง",
-        icon: Boxes,
+        asset: "stock",
+        icon: VISUAL_ASSETS.stock.fallback,
         description: "เบิกวัสดุจากคลัง",
     },
     {
         id: "routine",
         label: "NHF Routine",
         sidebarLabel: "งานประจำ",
-        icon: ClipboardCheck,
+        asset: "routine",
+        icon: VISUAL_ASSETS.routine.fallback,
         description: "บันทึกและติดตามงานประจำขององค์กร",
         feature: FEATURE_KEYS.routine,
     },
@@ -57,7 +57,8 @@ export const DASHBOARD_MENU_ITEMS: MenuItem[] = [
         id: "it-workspace",
         label: "บริการ IT",
         sidebarLabel: "บริการ IT",
-        icon: Headset,
+        asset: "it-ticket",
+        icon: VISUAL_ASSETS["it-ticket"].fallback,
         description: "แจ้งปัญหา ติดตามคำขอ และจัดการงานบริการ IT",
     },
     {
