@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactElement } from "react";
 import { ChevronDown, Home, PanelLeft, PanelLeftClose, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppLogo } from "@/components/brand/AppLogo";
+import { BrandAsset } from "@/components/brand/BrandAsset";
 import { cn } from "@/lib/ui/utils";
 import { type MenuGroup, type MenuItem } from "@/types/dashboard";
 import { CollapsedSidebarTooltip } from "@/components/dashboard/layout/CollapsedSidebarTooltip";
@@ -88,19 +89,30 @@ function SidebarMenuItem({
                         isActive ? "border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/75 hover:bg-surface-muted hover:text-sidebar-accent-foreground",
                         !sidebarOpen && "justify-center px-0",
                         indented && sidebarOpen && "h-11 pl-9",
+                        indented && sidebarOpen && item.asset && "gap-2",
+                        isActive && item.asset && "font-semibold",
                         disabled && "cursor-not-allowed opacity-55",
                     )}
                     onClick={disabled ? undefined : onClick}
                 >
-                    <span
-                        className={cn(
-                            "flex shrink-0 items-center justify-center rounded-lg transition-colors duration-150 ease-out",
-                            indented && sidebarOpen ? "size-5" : "size-7",
-                            isActive ? "bg-brand-solid text-content-on-brand" : "text-sidebar-foreground/60 group-hover/sidebar-item:text-sidebar-accent-foreground",
-                        )}
-                    >
-                        <IconComponent aria-hidden="true" className={indented && sidebarOpen ? "size-3.5" : "size-4"} />
-                    </span>
+                    {item.asset ? (
+                        <BrandAsset
+                            asset={item.asset}
+                            variant="compact"
+                            size="sm"
+                            className={cn((disabled || item.unavailable) && "grayscale")}
+                        />
+                    ) : (
+                        <span
+                            className={cn(
+                                "flex shrink-0 items-center justify-center rounded-lg transition-colors duration-150 ease-out",
+                                indented && sidebarOpen ? "size-5" : "size-7",
+                                isActive ? "bg-brand-solid text-content-on-brand" : "text-sidebar-foreground/60 group-hover/sidebar-item:text-sidebar-accent-foreground",
+                            )}
+                        >
+                            <IconComponent aria-hidden="true" className={indented && sidebarOpen ? "size-3.5" : "size-4"} />
+                        </span>
+                    )}
                     {sidebarOpen && (
                         <span className="min-w-0 flex-1 text-left">
                             <span className="block truncate">{item.unavailable ? (item.sidebarLabel ?? item.label) : itemLabel}</span>
