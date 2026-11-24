@@ -179,13 +179,19 @@ describe("compact NHF quick actions", () => {
         const grid = screen.getByRole("region", { name: "เมนูด่วน" });
         const buttons = within(grid).getAllByRole("button");
         expect(buttons.map((button) => button.textContent)).toEqual(["เบิกวัสดุ", "วันลา", "งานประจำ", "บริการ IT"]);
-        expect(buttons[0].querySelector("[data-shortcut-icon]")).toHaveClass("bg-module-stock-dashboard-surface");
-        expect(buttons[1].querySelector("[data-shortcut-icon]")).toHaveClass("bg-module-leave-dashboard-surface");
-        expect(buttons[2].querySelector("[data-shortcut-icon]")).toHaveClass("bg-module-routine-dashboard-surface");
-        expect(buttons[3].querySelector("[data-shortcut-icon]")).toHaveClass("bg-module-it-dashboard-surface");
+        const artworkPath = (button: HTMLElement) => {
+            const image = button.querySelector("img");
+            expect(image).toHaveAttribute("alt", "");
+            return image && new URL(image.src).pathname;
+        };
+        const expectedArtwork = ["stock", "leave", "routine", "it-ticket"].map((id) => `/assets/modules/${id}.svg`);
+        expect(buttons.map(artworkPath)).toEqual(expectedArtwork);
+        const desktopButtons = [/NHF Stock/, /NHF Leave/, /NHF Routine/, /NHF IT-TICKET/].map(
+            (name) => screen.getByRole("button", { name }),
+        );
+        expect(desktopButtons.map(artworkPath)).toEqual(expectedArtwork);
         for (const button of buttons) {
             expect(button).toHaveClass("bg-transparent", "focus-visible:ring-2");
-            expect(button.querySelector("[data-shortcut-icon]")).toHaveClass("size-16");
             expect(button.querySelector("[data-shortcut-label]")?.parentElement).toBe(button);
             expect(button.querySelector(".line-clamp-2")).not.toBeNull();
             expect(button).not.toHaveTextContent("Quick action");
@@ -215,6 +221,7 @@ describe("compact NHF quick actions", () => {
         const group = DASHBOARD_MENU_GROUPS[0];
         renderHome([{ ...group, items: group.items.filter(item => ["stock", "routine"].includes(item.id)) }]);
         expect(within(screen.getByRole("region", { name: "เมนูด่วน" })).getAllByRole("button").map(button => button.textContent)).toEqual(["เบิกวัสดุ", "งานประจำ"]);
+        expect(screen.queryByRole("button", { name: /NHF Leave|NHF IT-TICKET/ })).not.toBeInTheDocument();
     });
 
     it("does not substitute administrative services when no featured module is available", () => {
@@ -257,7 +264,7 @@ describe("compact NHF quick actions", () => {
             expect(within(grid).queryByText(longLabel)).not.toBeInTheDocument();
             const leave = within(grid).getByRole("button", { name: "วันลา (ยังไม่พร้อมให้บริการ)" });
             expect(within(leave).getByText("ยังไม่พร้อม")).toBeVisible();
-            expect(leave.querySelector("[data-shortcut-icon]")).toHaveClass("bg-surface-raised");
+            expect(leave.querySelector("[data-shortcut-icon]")).toHaveClass("grayscale");
             fireEvent.click(leave);
             expect(useDashboardUIContext().handleMenuClick).toHaveBeenCalledWith("leave-management");
         } finally { vi.unstubAllEnvs(); }
