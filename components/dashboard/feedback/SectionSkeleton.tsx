@@ -2,11 +2,7 @@ import type { ReactElement } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 
-export function SectionHeaderSkeleton({
-    showBadge = false,
-}: {
-    showBadge?: boolean;
-}): ReactElement {
+export function SectionHeaderSkeleton(): ReactElement {
     return (
         <div className="flex min-w-0 flex-col justify-between gap-4 sm:gap-6 lg:flex-row lg:items-end">
             <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -16,9 +12,7 @@ export function SectionHeaderSkeleton({
                     <Skeleton className="h-5 w-96 max-w-full" />
                 </div>
             </div>
-            {showBadge ? (
-                <Skeleton className="h-8 w-28 rounded-full" />
-            ) : null}
+            <div aria-hidden="true" />
         </div>
     );
 }
