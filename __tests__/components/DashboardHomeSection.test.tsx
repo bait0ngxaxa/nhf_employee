@@ -221,6 +221,7 @@ describe("compact NHF quick actions", () => {
 
     it("renders primary artwork on every projected administrative card and preserves click destinations", () => {
         renderHome(DASHBOARD_MENU_GROUPS.slice(1));
+        const { handleMenuClick } = useDashboardUIContext();
         const items = DASHBOARD_MENU_GROUPS.slice(1).flatMap((group) => group.items);
         expect(screen.queryByRole("button", { name: /นำเข้าจาก CSV/ })).not.toBeInTheDocument();
         for (const item of items) {
@@ -230,7 +231,7 @@ describe("compact NHF quick actions", () => {
             expect(button.querySelector("img")).toHaveAttribute("alt", "");
             expect(within(button).queryByRole("img")).not.toBeInTheDocument();
             fireEvent.click(button);
-            expect(useDashboardUIContext().handleMenuClick).toHaveBeenLastCalledWith(item.id);
+            expect(handleMenuClick).toHaveBeenLastCalledWith(item.id);
         }
     });
 
