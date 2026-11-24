@@ -227,7 +227,7 @@ The product is an Operate-mode application: a desktop shell frames scrollable wo
 - **Content frames:** The dashboard home uses a `max-w-7xl` frame (`80rem`), large management sections commonly use `max-w-6xl` (`72rem`), and focused forms use narrower `max-w-3xl` frames (`48rem`). Center content and avoid full-bleed data unless the table genuinely needs the width.
 - **Rhythm:** The recurring spacing cadence is `0.5rem`, `1rem`, `1.5rem`, and `2rem`, with larger `2.5rem` section padding at wide desktop. Section shells step from `1rem` padding on small screens to `1.5rem` and `2.5rem` on larger layouts.
 - **Responsive density:** Grids move from one column to two, three, and four columns as space permits. Featured module cards are one column on narrow screens and become multi-column/row layouts at container breakpoints. Tabs scroll horizontally on small screens and distribute across the available width on desktop.
-- **LINE/LIFF:** The mobile shell is capped at `max-w-lg` (`32rem`) and uses a sticky header plus a four-column bottom nav. Use `env(safe-area-inset-*)` for edge padding and keep important actions at least `2.75rem` high.
+- **LINE/LIFF:** The mobile shell is capped at `max-w-lg` (`32rem`) and uses a sticky header plus a five-column bottom nav. Use `env(safe-area-inset-*)` for edge padding and keep important actions at least `2.75rem` high.
 
 **The Progressive Density Rule.** Add columns and breathing room as the viewport grows; do not shrink text or touch targets to force desktop density onto mobile.
 
@@ -291,9 +291,9 @@ Buttons should feel direct, calm, and dependable: one clear action, medium-weigh
 
 ### Navigation
 
-- **Desktop sidebar:** `16rem` wide by default, `18rem` at `2xl`, or `5rem` collapsed. It uses `sidebar` background and border tokens. Items are at least `2.75rem` high with `rounded-xl`; active items use sidebar accent plus a brand-colored icon tile.
+- **Desktop sidebar:** `16rem` wide by default, `18rem` at `2xl`, or `5rem` collapsed. It uses `sidebar` background and border tokens. Items are at least `2.75rem` high with `rounded-xl`; active items use sidebar accent. Functional Lucide items also use a brand-colored icon tile.
 - **Utility bar:** Sticky at the top of the workspace with a faint bottom border and a translucent surface. Keep notifications, account controls, and the mobile menu trigger in the same predictable row.
-- **Mobile/LIFF:** The LIFF header is sticky and safe-area aware. The bottom nav is a four-column, `2.75rem`-minimum control with a small brand-colored active rule and label; inactive items stay muted but remain fully legible.
+- **Mobile/LIFF:** The LIFF header is sticky and safe-area aware. The bottom nav uses five columns, `3rem`-minimum controls, and a small brand-colored active rule. Inactive labels stay muted and the artwork retains its original colors.
 
 ### Section Tabs
 
@@ -314,8 +314,8 @@ The Trusted Operations Desk uses a Fluent-inspired family of original vectors. L
 | Level | Role | Usage |
 | --- | --- | --- |
 | 1 · Module identity | Recognizable artwork for a major NHF service | Primary artwork at 64px on Dashboard featured cards, Dashboard mobile shortcuts, and LINE LIFF Home. |
-| 2 · Menu identity | Simplified artwork for an individual destination | Primary artwork on Dashboard regular service cards and compact artwork in mobile More. |
-| 3 · Functional icon | An interface action, affordance, or state | Lucide for controls, status, navigation arrows, Sidebar, Bottom Navigation, and utility actions in More. |
+| 2 · Menu identity | Simplified artwork for an individual destination | Primary artwork on Dashboard regular service cards and compact artwork in mobile More and persistent Dashboard navigation. |
+| 3 · Functional icon | An interface action, affordance, or state | Lucide for controls, status, navigation arrows, Home, More, utility actions, and destinations without branded artwork. |
 
 - **Palette ownership** belongs to the corresponding module tokens in `app/globals.css`. Anchor Leave in Indigo (`#4f46e5`), Stock in Orange (`#ea580c`), Routine in Teal (`#0d9488`), and IT in `--module-it-solid` (`#1d4ed8`). Derive highlights and depth from the same family and review against light, dark, and module-colored surfaces.
 - **Variants** share a transparent `0 0 128 128` viewBox and consistent optical padding. Primary artwork supports 48–96px placements. At 20–32px use the compact artwork with simplified silhouettes and fewer details. Keep each self-contained SVG within 15 KB.
@@ -334,8 +334,16 @@ Level 2 gives individual destinations a recognizable silhouette with a quieter p
 | System administration | Authorization Administration uses a shield and key. Audit Logs uses an offset ledger with a vertical event sequence. | Cool neutrals from `--content-on-inverted-strong` (#f1f5f9), `--content-border` (#cbd5e1), `--content-muted` (#64748b), `--content-secondary` (#475569), and `--content-body` (#334155). |
 
 - **Ownership and naming.** Store `<menu-id>.svg` and `<menu-id>-compact.svg` in `public/assets/menus/`. Embed the token values above as SVG fills and validate contrast on both themes. Add both static imports to the existing `VISUAL_ASSETS` registry and reference the ID through `MenuItem.asset`. Resolve the menu's existing Lucide icon from the fallback entry.
-- **Approved surfaces.** Use `BrandAsset` primary at 32–48px on Dashboard regular service cards and compact at 24px in the mobile More list, including existing module artwork where those destinations appear. Employee Import appears through the existing capability-dependent More projection. Sidebar and Bottom Navigation are outside the v1.2 migration scope and continue to use Lucide.
+- **Approved surfaces.** Use `BrandAsset` primary at 32–48px on Dashboard regular service cards and compact at 24px in the mobile More list, including existing module artwork where those destinations appear. Employee Import appears through the existing capability-dependent More projection. Persistent navigation usage follows the v1.3 guidance below.
 - **Accessibility and extension.** Keep adjacent labels as the source of accessible names and use decorative artwork with empty alt text. Keep state labels visible, reserve the same geometry for the fallback, and distinguish destinations through silhouette and detail. Review new assets beside the Level 1 families at 96, 48, 32, 24, and 20px on light and dark surfaces. Extend the existing registry and keep route, capability, ordering, and availability rules in their current owners.
+
+### NHFapp Visual Identity System v1.3 — Navigation Identity
+
+- **Expanded and collapsed Sidebar.** Use a 24px compact `BrandAsset` for destinations in the existing menu groups. In indented rows, a smaller gap balances the wider artwork slot and preserves the label position. Center the same slot in the collapsed rail. Keep icon-only button names and the existing hover and keyboard-focus tooltips.
+- **Dashboard Bottom Navigation.** Carry `MenuItem.asset` through the existing capability-filtered tab projection. Render compact artwork in a 24px slot, including secondary destinations when projected. Home and More use their 20px Lucide icons centered in the same slot. Keep the existing tab limit, route ownership, navigation guards, and safe areas.
+- **LINE LIFF Bottom Navigation.** Reference the shared compact identities for Stock, Leave, Routine, and IT in the LIFF route configuration. Home uses its 20px House icon. Preserve the five-column layout and the LIFF-specific selected top indicator.
+- **Identity and state.** Keep artwork in its original colors for active and inactive destinations. Use the existing selection surface, foreground, border or indicator, and `aria-current="page"` to convey the current destination. Active branded Sidebar rows also use semibold labels. Keep hover and focus styling on the control. Sidebar artwork is grayscale when the destination is unavailable or coming soon. An unavailable destination keeps its existing status and navigation behavior, and a coming-soon destination stays disabled.
+- **Accessibility and extension.** Treat artwork and its fallback as decorative when the destination already has a label or an explicit accessible name. Preserve the artwork slot on fallback, the row dimensions, and touch targets. Reuse the shared renderer and registry for new identities, and keep utilities and interface affordances in Lucide. Review optical weight at actual size on both themes, including the existing More Menu, before changing an approved compact SVG.
 
 ## Do's and Don'ts
 

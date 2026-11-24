@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import type { ReactElement } from "react";
+import { BrandAsset } from "@/components/brand/BrandAsset";
 import { useDashboardDataContext } from "@/components/dashboard/context/dashboard/DashboardContext";
 import { projectDashboardMobileTabs, resolveDashboardMobileTab } from "@/lib/ui/dashboard-mobile-navigation";
 import { mobileNavigationItemClassName } from "@/lib/ui/mobile-navigation-styles";
@@ -19,7 +20,13 @@ export function DashboardBottomNav(): ReactElement {
                     return (
                         <li key={tab.id} className="min-w-0">
                             <DashboardNavigationLink href={tab.href} aria-current={activeId === tab.id ? "page" : undefined} className={`${mobileNavigationItemClassName(activeId === tab.id)} h-full`}>
-                                <Icon className="size-5" aria-hidden="true" />
+                                {tab.asset ? (
+                                    <BrandAsset asset={tab.asset} variant="compact" size="sm" />
+                                ) : (
+                                    <span className="grid size-6 shrink-0 place-items-center">
+                                        <Icon className="size-5" aria-hidden="true" />
+                                    </span>
+                                )}
                                 <span className="max-w-full truncate">{tab.label}</span>
                             </DashboardNavigationLink>
                         </li>
