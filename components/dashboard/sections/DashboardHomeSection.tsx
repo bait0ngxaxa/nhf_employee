@@ -9,6 +9,7 @@ import { Fragment, type ReactElement, type ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
 import type { MenuItem } from "@/types/dashboard";
 import { cn } from "@/lib/ui/utils";
+import { BrandAsset } from "@/components/brand/BrandAsset";
 import {
     useDashboardUIContext,
     useDashboardDataContext,
@@ -34,7 +35,6 @@ const MENU_ITEM_CONFIG: Record<
         featuredControlSurface?: string;
         featuredBorder?: string;
         featuredShadow?: string;
-        featuredIconHover?: string;
         featuredArrowHover?: string;
         featuredBadge?: string;
         featuredDescription?: string;
@@ -50,7 +50,6 @@ const MENU_ITEM_CONFIG: Record<
         featuredControlSurface: "bg-dashboard-featured-control-surface",
         featuredBorder: "border-module-leave-dashboard-accent hover:border-module-leave-dashboard-accent-hover",
         featuredShadow: "shadow-module-leave-dashboard-strong/15 hover:shadow-module-leave-dashboard-strong/20",
-        featuredIconHover: "group-hover:bg-dashboard-featured-control-surface group-hover:text-module-leave-badge-foreground",
         featuredArrowHover: "group-hover:bg-dashboard-featured-control-surface",
         featuredBadge: "text-module-leave-badge-foreground",
         featuredDescription: "text-module-leave-dashboard-muted",
@@ -65,7 +64,6 @@ const MENU_ITEM_CONFIG: Record<
         featuredControlSurface: "bg-dashboard-featured-control-surface",
         featuredBorder: "border-module-stock-dashboard-accent hover:border-module-stock-dashboard-accent-hover",
         featuredShadow: "shadow-module-stock-dashboard-strong/15 hover:shadow-module-stock-dashboard-strong/20",
-        featuredIconHover: "group-hover:bg-dashboard-featured-control-surface group-hover:text-module-stock-badge-foreground",
         featuredArrowHover: "group-hover:bg-dashboard-featured-control-surface",
         featuredBadge: "text-module-stock-badge-foreground",
         featuredDescription: "text-module-stock-dashboard-muted",
@@ -80,7 +78,6 @@ const MENU_ITEM_CONFIG: Record<
         featuredControlSurface: "bg-dashboard-featured-control-surface",
         featuredBorder: "border-module-routine-dashboard-accent hover:border-module-routine-dashboard-accent-hover",
         featuredShadow: "shadow-module-routine-dashboard-strong/15 hover:shadow-module-routine-dashboard-strong/20",
-        featuredIconHover: "group-hover:bg-dashboard-featured-control-surface group-hover:text-module-routine-badge-foreground",
         featuredArrowHover: "group-hover:bg-dashboard-featured-control-surface",
         featuredBadge: "text-module-routine-badge-foreground",
         featuredDescription: "text-module-routine-dashboard-muted",
@@ -95,7 +92,6 @@ const MENU_ITEM_CONFIG: Record<
         featuredControlSurface: "bg-dashboard-featured-control-surface",
         featuredBorder: "border-module-it-dashboard-accent hover:border-module-it-dashboard-accent-hover",
         featuredShadow: "shadow-module-it-dashboard-strong/15 hover:shadow-module-it-dashboard-strong/20",
-        featuredIconHover: "group-hover:bg-dashboard-featured-control-surface group-hover:text-module-it-badge-foreground",
         featuredArrowHover: "group-hover:bg-dashboard-featured-control-surface",
         featuredBadge: "text-module-it-badge-foreground",
         featuredDescription: "text-module-it-dashboard-muted",
@@ -129,13 +125,7 @@ function getDisplayText(value: string | null | undefined, fallback: string): str
 }
 
 interface FeaturedCardProps {
-    item: {
-        id: string;
-        label: string;
-        description?: string;
-        unavailable?: boolean;
-        icon: React.ElementType;
-    };
+    item: MenuItem;
     onClick: () => void;
     animationDelay: string;
 }
@@ -143,7 +133,7 @@ interface FeaturedCardProps {
 // Intentional visual exception:
 // Core NHF module quick actions retain the branded rich-card treatment.
 // Do not simplify these cards as part of generic UI de-slop cleanup.
-function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
+function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps): ReactElement {
     const IconComponent = item.icon;
     const config = MENU_ITEM_CONFIG[item.id] ?? DEFAULT_MENU_CONFIG;
 
@@ -170,14 +160,13 @@ function FeaturedCard({ item, onClick, animationDelay }: FeaturedCardProps) {
                 )}
             />
 
-            <div
-                className={cn(
-                    "relative z-10 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-content-on-brand/25 bg-content-on-brand/15 text-content-on-brand ring-1 ring-content-on-brand/10 transition-colors duration-200 @min-[72rem]:h-14 @min-[72rem]:w-14",
-                    config.featuredIconHover,
-                )}
-            >
-                <IconComponent className="h-8 w-8 @min-[72rem]:h-7 @min-[72rem]:w-7" aria-hidden="true" />
-            </div>
+            {item.asset ? (
+                <BrandAsset asset={item.asset} size="xl" className="relative z-10" />
+            ) : (
+                <span className="relative z-10 flex size-16 shrink-0 items-center justify-center">
+                    <IconComponent className="size-8" aria-hidden="true" />
+                </span>
+            )}
 
             <div className="relative z-10 min-w-0 flex-1">
                 <div className="mb-2 flex items-center gap-2">
@@ -284,17 +273,16 @@ const COMPACT_LABELS: Readonly<Record<string, string>> = {
 };
 
 function CompactQuickAction({ item, onClick }: { item: MenuItem; onClick: () => void }): ReactElement {
-    const config = MENU_ITEM_CONFIG[item.id] ?? DEFAULT_MENU_CONFIG;
     const Icon = item.icon;
     return (
         <button type="button" onClick={onClick} data-shortcut-id={item.id}
             aria-label={`${COMPACT_LABELS[item.id]}${item.unavailable ? " (ยังไม่พร้อมให้บริการ)" : ""}`}
             className="group flex min-w-0 w-full flex-col items-center gap-2 rounded-2xl bg-transparent px-0.5 pt-1 pb-2 text-center text-content-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dashboard-focus focus-visible:ring-offset-2">
             <span data-shortcut-icon className={cn(
-                "flex size-16 shrink-0 items-center justify-center rounded-2xl transition-transform duration-150 group-active:translate-y-px motion-reduce:transform-none",
-                item.unavailable ? "bg-surface-raised text-content-muted" : [config.featuredSurface, "text-content-on-brand"],
+                "flex size-16 shrink-0 items-center justify-center transition-transform duration-150 group-active:translate-y-px motion-reduce:transform-none",
+                item.unavailable && "text-content-muted opacity-60 grayscale",
             )}>
-                <Icon className="size-7" aria-hidden="true" />
+                {item.asset ? <BrandAsset asset={item.asset} size="xl" /> : <Icon className="size-7" aria-hidden="true" />}
             </span>
             <span data-shortcut-label className="line-clamp-2 h-10 w-full max-w-full text-xs font-semibold leading-5 [overflow-wrap:anywhere]">{COMPACT_LABELS[item.id]}</span>
             {item.unavailable ? <span className="text-xs leading-5 text-content-secondary">ยังไม่พร้อม</span> : null}
