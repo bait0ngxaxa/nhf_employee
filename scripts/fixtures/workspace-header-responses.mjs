@@ -88,7 +88,8 @@ export function workspaceResponse(pathname, scenario) {
                     averageFirstResponseMinutes: null, averageResolutionMinutes: null,
                 },
                 trend: [], statusDistribution: [], typeDistribution: [], priorityDistribution: [],
-                priorityBacklog: [], responseResolutionByPriority: [], backlogAging: [],
+                priorityBacklog: [], responseResolutionByPriority: [],
+                backlogAging: ["0_1", "2_3", "4_7", "8_14", "15_PLUS"].map((bucket) => ({ bucket, count: 0 })),
                 categoryBacklog: [], assigneeBacklog: [], departmentCreated: [],
                 topCategories: { limit: 10, rows: [], otherCategoryCount: 0, otherTicketCount: 0 },
             } };

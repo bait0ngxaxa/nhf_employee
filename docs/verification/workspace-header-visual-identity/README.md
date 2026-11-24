@@ -18,7 +18,9 @@ Chromium renders the actual Dashboard workspaces and LIFF module components with
 | Authorization administration | [Capture](1440-dashboard-authorization-administration-light.png) | [Capture](1440-dashboard-authorization-administration-dark.png) |
 | Audit logs | [Capture](1440-dashboard-audit-logs-light.png) | [Capture](1440-dashboard-audit-logs-dark.png) |
 
-The IT [Queue](1440-dashboard-it-queue-light.png) and [Analytics](1440-dashboard-it-analytics-dark.png) tabs show a single workspace identity. At smaller widths compare [Routine at 1024px](1024-dashboard-routine-dark.png), [Routine at 768px](768-dashboard-routine-light.png), [Import at 390px](390-dashboard-import-employee-light.png), and [Authorization at 320px](320-dashboard-authorization-administration-dark.png). The other responsive Dashboard captures follow the same filename pattern.
+The IT [Queue](1440-dashboard-it-queue-light.png) and Analytics tabs show a single workspace identity. The Analytics captures show the loaded report with zero counts using all five backlog aging buckets. [Light](1440-dashboard-it-analytics-light.png) · [Dark](1440-dashboard-it-analytics-dark.png)
+
+At smaller widths compare [Routine at 1024px](1024-dashboard-routine-dark.png), [Routine at 768px](768-dashboard-routine-light.png), [Import at 390px](390-dashboard-import-employee-light.png), and [Authorization at 320px](320-dashboard-authorization-administration-dark.png). The other responsive Dashboard captures follow the same filename pattern.
 
 ## LINE LIFF
 
@@ -36,6 +38,8 @@ The IT [Queue](1440-dashboard-it-queue-light.png) and [Analytics](1440-dashboard
 - LIFF [IT request form](390-liff-it-create-light.png) and [ticket detail](390-liff-it-detail-dark.png) retain contextual headings. The sticky master logo and navigation remain visible.
 
 The workspace checks exercise primary artwork resolution and decoding, empty alt text, heading count and focusability, responsive artwork geometry, horizontal overflow, the Routine export, CSV back and authorization refresh controls, IT tab changes, and artwork fallback without moving the heading. API requests stay local to the fixture.
+
+The Analytics check requires the active report tab, its loaded overview, and an absent loading indicator and error alert before verifying the heading and capturing the screenshot. With the original empty aging array, the check failed on the invalid-report alert. The corrected workspace suite passed 106 cases, and the separate IT Analytics browser regression passed 56 cases.
 
 ## Reproduce
 
