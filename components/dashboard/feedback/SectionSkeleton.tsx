@@ -9,9 +9,12 @@ export function SectionHeaderSkeleton({
 }): ReactElement {
     return (
         <div className="flex min-w-0 flex-col justify-between gap-4 sm:gap-6 lg:flex-row lg:items-end">
-            <div className="min-w-0 flex-1 space-y-2">
-                <Skeleton className="h-8 w-56 max-w-full sm:h-9" />
-                <Skeleton className="h-4 w-96 max-w-full" />
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+                <Skeleton className="size-12 shrink-0 rounded-lg lg:size-16" aria-hidden="true" />
+                <div className="min-w-0 space-y-1">
+                    <Skeleton className="h-[1.875rem] w-56 max-w-full sm:h-[2.34375rem] lg:h-[2.8125rem]" />
+                    <Skeleton className="h-5 w-96 max-w-full" />
+                </div>
             </div>
             {showBadge ? (
                 <Skeleton className="h-8 w-28 rounded-full" />

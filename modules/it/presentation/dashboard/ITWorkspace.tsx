@@ -102,6 +102,7 @@ export function ITWorkspace({
     return (
         <SectionShell className="border-border-subtle/70 bg-dashboard-workspace">
             <SectionHeader
+                asset="it-ticket"
                 title="บริการ IT"
                 subtitle="แจ้งปัญหา ติดตามคำขอ และจัดการงานบริการ IT"
             />
