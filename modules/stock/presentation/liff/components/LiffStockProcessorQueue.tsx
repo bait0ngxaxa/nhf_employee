@@ -52,12 +52,12 @@ export function LiffStockProcessorQueue({
     return (
         <section aria-labelledby="liff-stock-processing-heading" className="space-y-4">
             <div>
-                <h1
+                <h2
                     id="liff-stock-processing-heading"
                     className="text-xl font-bold tracking-tight text-content-heading"
                 >
                     คำขอรอดำเนินการ
-                </h1>
+                </h2>
                 <p className="mt-1 text-sm leading-6 text-content-secondary">
                     ตรวจรายการให้ครบก่อนยืนยันจ่ายวัสดุ การจ่ายจะตัดสต็อกทันที
                 </p>
