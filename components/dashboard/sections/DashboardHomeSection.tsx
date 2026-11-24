@@ -246,7 +246,14 @@ function RegularCard({
                 </span>
             )}
 
-            <div className="flex h-full flex-col p-5 md:p-6">
+            <div className="flex h-full flex-col gap-2 p-5 md:p-6">
+                {item.asset && !MENU_ITEM_CONFIG[item.id]?.featured && (
+                    <BrandAsset
+                        asset={item.asset}
+                        size="lg"
+                        className={cn("size-8 xl:size-12", (disabled || item.unavailable) && "grayscale")}
+                    />
+                )}
                 <div className="mt-auto">
                     <h3
                         className={cn(
