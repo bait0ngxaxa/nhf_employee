@@ -38,10 +38,17 @@ describe("NHFapp Rich Menu definition", () => {
 
         expect(definition).toMatchObject({
             size: { width: 2500, height: 843 },
+            selected: true,
             name: "NHFapp",
             chatBarText: "เลือกบริการ",
         });
         expect(definition.areas).toHaveLength(4);
+        expect(definition.areas.map(({ action }) => [action.type, action.label])).toEqual([
+            ["uri", "เบิกวัสดุ"],
+            ["uri", "ลางาน"],
+            ["uri", "งานของฉัน"],
+            ["uri", "แจ้ง IT"],
+        ]);
         expect(definition.areas.map((area) => area.action.uri)).toEqual([
             "https://liff.line.me/nhfapp-liff-id/stock",
             "https://liff.line.me/nhfapp-liff-id/leave",

@@ -353,6 +353,13 @@ Level 2 gives individual destinations a recognizable silhouette with a quieter p
 - **LINE LIFF.** The sticky header owns the NHFapp master logo and section label. Stock, Leave, Routine, and IT use the module artwork in their entry content. Stock introduces the title “บริการเบิกวัสดุ”; the Leave approvals tab uses “Leave”, matching the employee view. IT creation and ticket details keep their task-specific titles. Unavailable or access-denied screens keep their status icons and recovery controls.
 - **Semantics and loading.** Keep the textual heading as the accessible name. Dashboard route focus targets use `data-page-heading` and `tabIndex={-1}` on the heading itself. Align existing skeletons with the responsive artwork slot where the skeleton already depicts a page header. Artwork and fallback stay separate from the heading and its actions, including when the service is unavailable.
 
+### NHFapp Visual Identity System v1.5 — LINE Rich Menu Identity
+
+- **Artwork ownership.** Use the approved primary Stock, Leave, Routine, and IT SVGs from `public/assets/modules/`. The unified PNG at `assets/line/nhf-rich-menu.png` is a generated distribution asset. Artwork changes belong in the canonical SVGs and need review on their existing surfaces before regenerating the Rich Menu.
+- **Composition.** Keep four equal horizontal action areas in the order Stock, Leave, Routine, IT. Each tile centers the module artwork above one Thai service label in bundled Noto Sans Thai Bold. Use the light module badge surfaces and shared neutral foreground and border colors. Keep labels on one line at a consistent size, with enough space for Thai marks and room at both edges.
+- **Output and runtime.** `npm run line:richmenu:asset` uses Sharp to read the SVGs and the bundled font from disk. Next.js static imports remain owned by the web asset registry. The output is an opaque 2500 × 843 PNG, at most 1,000,000 bytes, with four 625 × 843 tiles. `lib/line/rich-menu.ts` owns LINE actions, geometry, and LIFF destinations.
+- **Review.** Inspect the actual generated PNG at full resolution and at 430, 390, 360, and 320px. Verify the artwork and Thai text against the action-area diagnostic. Preserve the single-label layout when approved artwork evolves. Changes to available destinations or action areas require a separate navigation decision. [Visual evidence](docs/verification/rich-menu-visual-identity/README.md)
+
 ## Do's and Don'ts
 
 ### Do:
