@@ -294,7 +294,7 @@ export function StockSectionSkeleton(): ReactElement {
             aria-label="กำลังโหลดหน้าสต็อก"
         >
             <div className="space-y-8 p-4 sm:space-y-10 sm:p-6 lg:p-10">
-                <SectionHeaderSkeleton showBadge />
+                <SectionHeaderSkeleton />
                 <div className="space-y-6">
                     <TabsSkeleton count={5} />
                     <StockFiltersSkeleton />

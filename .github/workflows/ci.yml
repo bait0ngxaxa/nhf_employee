@@ -51,6 +51,8 @@ jobs:
         run: npx --no-install next typegen
       - name: Typecheck
         run: npm run typecheck
+      - name: Verify offline Rich Menu artifact
+        run: npm run line:richmenu:verify
 
   unit:
     name: Unit Tests

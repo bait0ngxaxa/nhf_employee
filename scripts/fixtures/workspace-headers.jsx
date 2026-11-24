@@ -3,13 +3,25 @@ import LeaveDashboardPage from "@/app/dashboard/leave/page";
 import { StockRouteContent } from "@/app/dashboard/stock/StockRouteContent";
 import { APP_ROUTES } from "@/lib/ssot/routes";
 import { AnnouncementManager } from "@/modules/announcements/client";
-import { AuditLogsSection } from "@/modules/audit/client";
+import { AuditLogsSection, AuditLogsSectionSkeleton } from "@/modules/audit/client";
 import { AuthorizationAdministrationWorkspace } from "@/modules/authorization/client";
-import { AddEmployeeSection, EmployeeManagementSection, ImportEmployeeRouteContent } from "@/modules/employee/client";
-import { EmailRequestSection, ITWorkspace, LiffITApp } from "@/modules/it/client";
+import { AddEmployeeSection, EmployeeManagementSection, EmployeeManagementSectionSkeleton, ImportEmployeeRouteContent } from "@/modules/employee/client";
+import { EmailRequestSection, EmailRequestSectionSkeleton, ITWorkspace, LiffITApp } from "@/modules/it/client";
 import { LeaveManagementSection, LeaveManagementSectionSkeleton, LiffLeaveApp } from "@/modules/leave/client";
-import { LiffRoutineApp, RoutineSection } from "@/modules/routine/client";
-import { LiffStockApp } from "@/modules/stock/client";
+import { LiffRoutineApp, RoutineSection, RoutineSectionSkeleton } from "@/modules/routine/client";
+import { LiffStockApp, StockSectionSkeleton } from "@/modules/stock/client";
+import { FormSectionSkeleton, ImportSectionSkeleton } from "@/components/dashboard/feedback/SectionSkeleton";
+
+const routeSkeletons = {
+    [APP_ROUTES.dashboardLeave]: LeaveManagementSectionSkeleton,
+    [APP_ROUTES.dashboardStock]: StockSectionSkeleton,
+    [APP_ROUTES.dashboardRoutine]: RoutineSectionSkeleton,
+    [APP_ROUTES.dashboardEmployees]: EmployeeManagementSectionSkeleton,
+    [APP_ROUTES.dashboardEmployeeNew]: FormSectionSkeleton,
+    [APP_ROUTES.dashboardEmployeeImport]: ImportSectionSkeleton,
+    [APP_ROUTES.dashboardEmailRequest]: EmailRequestSectionSkeleton,
+    [APP_ROUTES.dashboardAudit]: AuditLogsSectionSkeleton,
+};
 
 export function workspaceCapabilities(variant) {
     return {
@@ -34,10 +46,11 @@ function UnavailableLeave() {
 }
 
 export function DashboardWorkspace({ pathname, variant }) {
+    const Loading = routeSkeletons[pathname];
+    if (variant === "loading" && Loading) return <Loading />;
     switch (pathname) {
         case APP_ROUTES.dashboardLeave:
             if (variant === "unavailable") return <UnavailableLeave />;
-            if (variant === "loading") return <LeaveManagementSectionSkeleton />;
             return <LeaveManagementSection />;
         case APP_ROUTES.dashboardStock:
             return <StockRouteContent />;

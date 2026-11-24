@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { workspaceResponse } from "./workspace-header-responses.mjs";
 
@@ -23,6 +23,37 @@ const liff = [
     ["/liff/it", "it-ticket", "คำขอ IT ของฉัน"],
 ];
 const primaryImages = 'img[src^="/_next/static/media/"][src$=".svg"]:not([src$="-compact.svg"])';
+const measuredRoutes = new Set(["leave", "stock", "routine", "employee-management", "add-employee", "import-employee", "email-request", "audit-logs"]);
+const readyContent = {
+    leave: "โควต้าวันลาของคุณ",
+    stock: "ไม่พบวัสดุที่ค้นหา",
+    routine: "ยังไม่มีรายการ Routine",
+    "it-ticket": "#42 · เข้าใช้งานระบบไม่ได้",
+    "employee-management": "ยังไม่มีข้อมูลพนักงาน",
+    "authorization-administration": "ยังไม่มีทีม",
+};
+
+function measureHeader(artwork, { loading = false, grouped = false } = {}) {
+    return artwork.evaluate((element, { loading, grouped }) => {
+        const rect = (node) => {
+            if (!node) return null;
+            const { x, y, width, height } = node.getBoundingClientRect();
+            return { x, y, width, height };
+        };
+        const slot = loading ? element : element.parentElement;
+        const row = slot.parentElement;
+        const header = grouped ? row.parentElement : row;
+        return {
+            header: rect(header),
+            slot: rect(slot),
+            text: rect(row.children[1]),
+            title: rect(row.children[1].firstElementChild),
+            action: rect(loading ? (grouped && row.nextElementSibling?.childElementCount ? row.nextElementSibling : null)
+                : header.querySelector("button")),
+            content: rect(header.nextElementSibling),
+        };
+    }, { loading, grouped });
+}
 
 export async function checkWorkspaceHeaders(browser, origin) {
     const screenshots = process.env.WORKSPACE_HEADER_SCREENSHOT_DIR;
@@ -32,6 +63,7 @@ export async function checkWorkspaceHeaders(browser, origin) {
     const widths = widthArgument === undefined ? supportedWidths : [Number(widthArgument)];
     assert.ok(widths.every((width) => supportedWidths.includes(width)), "Use a supported workspace viewport width");
     const unhandled = new Set();
+    const measurements = [];
     let count = 0;
     for (const theme of ["light", "dark"]) {
         for (const width of widths) {
@@ -79,8 +111,10 @@ export async function checkWorkspaceHeaders(browser, origin) {
                 const image = images.first();
                 assert.equal(await image.getAttribute("src"), `/_next/static/media/${asset}.svg`);
                 assert.equal(await image.getAttribute("alt"), "");
+                const reservedArtwork = await image.boundingBox();
                 await image.evaluate((element) => element.decode());
                 const artwork = await image.boundingBox();
+                assert.deepEqual(artwork, reservedArtwork, "Decoding preserves the reserved artwork slot");
                 const text = await heading.boundingBox();
                 assert.equal(artwork.width, pixels);
                 assert.equal(artwork.height, pixels);
@@ -109,10 +143,45 @@ export async function checkWorkspaceHeaders(browser, origin) {
                     }
                     if (asset === "import-employee") await page.getByRole("button", { name: "กลับไปรายชื่อ" }).waitFor();
                     if (asset === "authorization-administration") await page.getByRole("button", { name: "โหลดข้อมูลล่าสุด" }).waitFor();
+                    if (readyContent[asset]) {
+                        await page.locator("main").getByText(readyContent[asset], { exact: true }).first().waitFor();
+                        assert.equal(await page.locator("main").getByRole("alert").count(), 0);
+                    }
                     await heading.focus();
                     assert.equal(await heading.evaluate((element) => element === document.activeElement), true);
                     await heading.evaluate((element) => element.blur());
                     await capture(`dashboard-${asset}`);
+                }
+                for (const [path, asset, title, core] of dashboard.filter(([, id]) => measuredRoutes.has(id))) {
+                    const grouped = !["email-request", "audit-logs"].includes(asset);
+                    const pixels = core ? (width >= 1024 ? 64 : 48) : (width >= 640 ? 48 : 32);
+                    await open(`${path}?fixture=loading`);
+                    const loading = page.locator('main [role="status"][aria-busy="true"]').first();
+                    const placeholder = loading.locator('[data-slot="skeleton"]').first();
+                    await placeholder.waitFor();
+                    await page.evaluate(() => document.fonts.ready);
+                    const before = await measureHeader(placeholder, { loading: true, grouped });
+                    await page.evaluate((pathname) => {
+                        history.replaceState(null, "", pathname);
+                        dispatchEvent(new PopStateEvent("popstate"));
+                    }, path);
+                    const { image } = await check(asset, title, pixels, true);
+                    const ready = await measureHeader(image, { grouped: true });
+                    assert.equal(before.slot.width, ready.slot.width, `${asset} placeholder width`);
+                    assert.equal(before.slot.height, ready.slot.height, `${asset} placeholder height`);
+                    assert.ok(Math.abs(before.text.x - ready.text.x) <= 1, `${asset} horizontal heading anchor`);
+                    if (asset === "stock") {
+                        // Short one-line subtitle and no actions in either state.
+                        assert.ok(Math.abs(before.content.y - ready.content.y) <= 1, "Stock content starts at the same position");
+                    }
+                    if (asset === "employee-management" && width <= 390) {
+                        // Two full-width actions account for the same space; border and text metrics may differ.
+                        assert.ok(Math.abs(before.content.y - ready.content.y) <= 8, "Employee action placeholders match the loaded row count");
+                    }
+                    if (asset === "employee-management" && width >= 1024) {
+                        assert.ok(Math.abs(before.slot.y - ready.slot.y) <= 2, "Employee placeholder actions stay on one desktop row");
+                    }
+                    measurements.push({ width, theme, asset, loading: before, ready });
                 }
                 if (width === 390 || width === 320) {
                     for (const [path, asset, title] of liff) {
@@ -138,7 +207,9 @@ export async function checkWorkspaceHeaders(browser, origin) {
                     assert.equal(await page.getByRole("button", { name: "ส่งออก Excel รายการทั้งหมด" }).count(), 0);
                     const before = await heading.boundingBox();
                     await image.dispatchEvent("error");
-                    await page.locator("main .lucide-clipboard-check[aria-hidden=true]").waitFor();
+                    const dashboardFallback = page.locator("main .lucide-clipboard-check[aria-hidden=true]");
+                    await dashboardFallback.waitFor();
+                    assert.equal((await dashboardFallback.boundingBox()).width, 24);
                     assert.deepEqual(await heading.boundingBox(), before);
                     await capture("dashboard-routine-fallback");
 
@@ -183,7 +254,9 @@ export async function checkWorkspaceHeaders(browser, origin) {
                     const routine = await check("routine", "งาน Routine ของฉัน", 32, false);
                     const routinePosition = await routine.heading.boundingBox();
                     await routine.image.dispatchEvent("error");
-                    await page.locator("main .lucide-clipboard-check[aria-hidden=true]").waitFor();
+                    const liffFallback = page.locator("main .lucide-clipboard-check[aria-hidden=true]");
+                    await liffFallback.waitFor();
+                    assert.equal((await liffFallback.boundingBox()).width, 20);
                     assert.deepEqual(await routine.heading.boundingBox(), routinePosition);
                     await capture("liff-routine-fallback");
                     await open("/liff/it");
@@ -227,5 +300,8 @@ export async function checkWorkspaceHeaders(browser, origin) {
         }
     }
     assert.deepEqual([...unhandled].sort(), [], "Workspace fixture is missing API responses");
+    if (process.env.WORKSPACE_HEADER_MEASUREMENTS_PATH) {
+        await writeFile(process.env.WORKSPACE_HEADER_MEASUREMENTS_PATH, JSON.stringify(measurements, null, 2) + "\n");
+    }
     process.stdout.write(`Workspace header checks passed: ${count} cases (Chromium component fixture).\n`);
 }

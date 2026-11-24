@@ -19,7 +19,7 @@ export function DashboardBottomNav(): ReactElement {
                     const Icon = tab.icon;
                     return (
                         <li key={tab.id} className="min-w-0">
-                            <DashboardNavigationLink href={tab.href} aria-current={activeId === tab.id ? "page" : undefined} className={`${mobileNavigationItemClassName(activeId === tab.id)} h-full`}>
+                            <DashboardNavigationLink href={tab.href} aria-label={tab.accessibleLabel} aria-current={activeId === tab.id ? "page" : undefined} className={`${mobileNavigationItemClassName(activeId === tab.id)} h-full`}>
                                 {tab.asset ? (
                                     <BrandAsset asset={tab.asset} variant="compact" size="sm" />
                                 ) : (

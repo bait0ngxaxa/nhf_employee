@@ -360,6 +360,14 @@ Level 2 gives individual destinations a recognizable silhouette with a quieter p
 - **Output and runtime.** `npm run line:richmenu:asset` uses Sharp to read the SVGs and the bundled font from disk. Next.js static imports remain owned by the web asset registry. The output is an opaque 2500 × 843 PNG, at most 1,000,000 bytes, with four 625 × 843 tiles. `lib/line/rich-menu.ts` owns LINE actions, geometry, and LIFF destinations.
 - **Review.** Inspect the actual generated PNG at full resolution and at 430, 390, 360, and 320px. Verify the artwork and Thai text against the action-area diagnostic. Preserve the single-label layout when approved artwork evolves. Changes to available destinations or action areas require a separate navigation decision. [Visual evidence](docs/verification/rich-menu-visual-identity/README.md)
 
+### NHFapp Visual Identity System v1.6 — Engineering Hardening and Approved Design Baseline
+
+- **Approved baseline.** Preserve the reviewed cards, navigation, workspace headers, LINE LIFF surfaces, master logo, palettes, and unified LINE Rich Menu artwork. The deferred v1.1 desktop redesign was cancelled. A future visual change requires explicit product approval and comparison with the rendered baseline.
+- **Artwork failure.** Keep the original responsive artwork slot and accessible name. A compact fallback fills 80% of the slot. A primary fallback uses half the slot with a minimum of 20px when space allows, capped at 80% of the slot. These sizes apply only after an image error.
+- **Mobile labels.** Use short Thai labels only in the Dashboard mobile tab projection. Keep the full destination name available to assistive technology and include the visible wording in that name. Check crowded and restricted projections down to 320px.
+- **Workspace stability.** Measure real loading and ready components at the same viewport. Match placeholder artwork slots and known action rows to the ready header while allowing Thai copy to wrap and actions to vary with permissions.
+- **Canonical assets.** Keep all eleven identities and twenty-two SVGs in the shared registry. Use `npm run line:richmenu:verify` to verify the committed PNG and its source fingerprint offline. When approved inputs change, run `npm run line:richmenu:asset`, review the mobile previews, verify again, and commit the PNG and manifest together if they changed. Component fixtures and offline images supplement the authorized application, physical-device, LINE and screen-reader checks. [Verification and operator checklist](docs/verification/visual-identity-hardening/README.md)
+
 ## Do's and Don'ts
 
 ### Do:
