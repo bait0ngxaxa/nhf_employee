@@ -63,6 +63,7 @@ describe("BrandAsset", () => {
 
         fireEvent.error(image);
         expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+        expect(container.querySelector("svg")).toHaveClass("size-[min(80%,max(50%,1.25rem))]");
         expect(screen.queryByRole("img")).toBeNull();
     });
 
@@ -76,11 +77,27 @@ describe("BrandAsset", () => {
         fireEvent.error(image);
         const fallback = screen.getByRole("img", { name: "Audit logs" });
         expect(fallback.tagName).toBe("svg");
+        expect(fallback).toHaveClass("size-4/5");
         expect(fallback.parentElement).toBe(box);
 
         rerender(<BrandAsset asset="audit-logs" size="sm" alt="Audit logs" />);
         expect(screen.getByRole<HTMLImageElement>("img", { name: "Audit logs" }).src).toBe(
             new URL(VISUAL_ASSETS["audit-logs"].src, document.baseURI).href,
         );
+    });
+
+    it("keeps responsive size overrides on the same slot when primary artwork fails", () => {
+        const { container } = render(<BrandAsset asset="routine" size="lg" className="size-8 sm:size-12 grayscale" />);
+        const image = container.querySelector("img");
+        if (!image) throw new Error("Missing responsive artwork");
+        const slot = image.parentElement;
+        expect(slot).toHaveClass("size-8", "sm:size-12", "grayscale");
+        expect(image).toHaveClass("size-full");
+
+        fireEvent.error(image);
+        const fallback = container.querySelector("svg");
+        expect(fallback?.parentElement).toBe(slot);
+        expect(fallback).toHaveClass("size-[min(80%,max(50%,1.25rem))]");
+        expect(fallback).toHaveAttribute("aria-hidden", "true");
     });
 });

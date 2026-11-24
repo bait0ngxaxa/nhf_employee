@@ -27,16 +27,17 @@ type ArtworkProps = {
     src: string;
     pixels: number;
     alt: string;
+    variant: NonNullable<BrandAssetProps["variant"]>;
     fallback: (typeof VISUAL_ASSETS)[VisualAssetKey]["fallback"];
 };
 
-function Artwork({ src, pixels, alt, fallback: Fallback }: ArtworkProps): ReactElement {
+function Artwork({ src, pixels, alt, variant, fallback: Fallback }: ArtworkProps): ReactElement {
     const [failed, setFailed] = useState(false);
 
     if (failed) {
         return (
             <Fallback
-                className="size-1/2"
+                className={variant === "compact" ? "size-4/5" : "size-[min(80%,max(50%,1.25rem))]"}
                 role={alt ? "img" : undefined}
                 aria-label={alt || undefined}
                 aria-hidden={alt ? undefined : true}
@@ -70,7 +71,7 @@ export function BrandAsset({
 
     return (
         <span className={cn("inline-flex shrink-0 items-center justify-center", preset.className, className)}>
-            <Artwork key={src} src={src} pixels={preset.pixels} alt={alt} fallback={definition.fallback} />
+            <Artwork key={src} src={src} pixels={preset.pixels} alt={alt} variant={variant} fallback={definition.fallback} />
         </span>
     );
 }
