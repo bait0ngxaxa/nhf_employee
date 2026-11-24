@@ -52,12 +52,12 @@ export function LiffStockMyRequests({
     return (
         <section aria-labelledby="liff-stock-history-heading" className="space-y-4">
             <div>
-                <h1
+                <h2
                     id="liff-stock-history-heading"
                     className="text-xl font-bold tracking-tight text-content-heading"
                 >
                     คำขอเบิกของฉัน
-                </h1>
+                </h2>
                 <p className="mt-1 text-sm leading-6 text-content-secondary">
                     ติดตามสถานะและยกเลิกคำขอที่ยังรอจ่ายได้
                 </p>

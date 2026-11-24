@@ -811,6 +811,7 @@ function RoutineSectionCapabilitySurface() {
     return (
         <SectionShell className="routine-section border-brand-border/70 bg-dashboard-workspace lg:rounded-2xl">
             <SectionHeader
+                asset="routine"
                 title="NHF Routine"
                 subtitle="รวมรายการ Routine ตามกำหนดเวลา ผู้รับผิดชอบ และการแจ้งเตือนที่เกี่ยวข้อง"
                 extra={canExportTasks ? (

@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { AdministrativeHeadingSkeleton } from "@/components/dashboard/feedback/SectionSkeleton";
 
 function EmployeePaginationSkeleton(): ReactElement {
     return (
@@ -134,10 +135,7 @@ export function EmployeeManagementSectionSkeleton(): ReactElement {
         >
             <div className="min-w-0 space-y-8 p-4 md:p-8">
                 <div className="flex min-w-0 flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                    <div className="min-w-0 space-y-2">
-                        <Skeleton className="h-8 w-56 max-w-full" />
-                        <Skeleton className="h-4 w-80 max-w-full" />
-                    </div>
+                    <AdministrativeHeadingSkeleton />
                     <div className="flex w-full flex-wrap gap-3 lg:w-auto lg:justify-end">
                         {Array.from({ length: 3 }).map((_, index) => (
                             <Skeleton

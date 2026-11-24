@@ -9,13 +9,28 @@ export function SectionHeaderSkeleton({
 }): ReactElement {
     return (
         <div className="flex min-w-0 flex-col justify-between gap-4 sm:gap-6 lg:flex-row lg:items-end">
-            <div className="min-w-0 flex-1 space-y-2">
-                <Skeleton className="h-8 w-56 max-w-full sm:h-9" />
-                <Skeleton className="h-4 w-96 max-w-full" />
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+                <Skeleton className="size-12 shrink-0 rounded-lg lg:size-16" aria-hidden="true" />
+                <div className="min-w-0 space-y-1">
+                    <Skeleton className="h-[1.875rem] w-56 max-w-full sm:h-[2.34375rem] lg:h-[2.8125rem]" />
+                    <Skeleton className="h-5 w-96 max-w-full" />
+                </div>
             </div>
             {showBadge ? (
                 <Skeleton className="h-8 w-28 rounded-full" />
             ) : null}
+        </div>
+    );
+}
+
+export function AdministrativeHeadingSkeleton(): ReactElement {
+    return (
+        <div className="flex min-w-0 items-start gap-3" aria-hidden="true">
+            <Skeleton className="size-8 shrink-0 rounded-lg sm:size-12" />
+            <div className="min-w-0 space-y-1">
+                <Skeleton className="h-8 w-56 max-w-full" />
+                <Skeleton className="h-5 w-80 max-w-full" />
+            </div>
         </div>
     );
 }
@@ -151,10 +166,7 @@ export function FormSectionSkeleton(): ReactElement {
         >
             <div className="space-y-8 p-4 md:p-8">
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                    <div className="min-w-0 space-y-2">
-                        <Skeleton className="h-8 w-56 max-w-full" />
-                        <Skeleton className="h-4 w-72 max-w-full" />
-                    </div>
+                    <AdministrativeHeadingSkeleton />
                     <Skeleton className="h-11 w-full sm:w-36" />
                 </div>
 
@@ -192,10 +204,7 @@ export function ImportSectionSkeleton(): ReactElement {
             aria-label="กำลังโหลดหน้านำเข้าพนักงาน"
         >
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                <div className="space-y-2">
-                    <Skeleton className="h-8 w-64 max-w-full" />
-                    <Skeleton className="h-4 w-80 max-w-full" />
-                </div>
+                <AdministrativeHeadingSkeleton />
                 <Skeleton className="h-11 w-full sm:w-36" />
             </div>
             <div className="border-b border-border-subtle pb-4">

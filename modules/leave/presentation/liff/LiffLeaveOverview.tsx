@@ -1,3 +1,4 @@
+import { WorkspaceHeading } from "@/components/ui/workspace-heading";
 import { Plus } from "lucide-react";
 import type { ReactElement } from "react";
 
@@ -21,12 +22,12 @@ export function LiffLeaveOverview({
         <div className="space-y-5">
             <section className="border-b border-module-leave-border pb-5">
                 <div className="flex flex-col gap-4 min-[360px]:flex-row min-[360px]:items-end min-[360px]:justify-between">
-                    <div className="min-w-0">
+                    <WorkspaceHeading asset="leave" size="liff">
                         <h1 className="text-2xl font-bold tracking-tight text-content-heading">Leave</h1>
                         <p className="mt-1 max-w-[28ch] text-sm leading-6 text-content-secondary">
                             ดูสิทธิ์ ส่งคำขอ และติดตามสถานะได้จาก LINE
                         </p>
-                    </div>
+                    </WorkspaceHeading>
                     {canCreateRequests ? (
                         <Button
                             type="button"

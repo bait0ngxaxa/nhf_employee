@@ -1,5 +1,7 @@
 "use client";
 
+import { WorkspaceHeading } from "@/components/ui/workspace-heading";
+
 import type { StockRequestStatus } from "@prisma/client";
 import { useSearchParams } from "next/navigation";
 import {
@@ -989,6 +991,9 @@ export function LiffStockApp(): ReactElement {
             className="bg-surface-subtle px-[max(1rem,env(safe-area-inset-left))] pb-8 pt-5 pr-[max(1rem,env(safe-area-inset-right))]"
         >
             <div className="mx-auto w-full max-w-lg space-y-4">
+                <WorkspaceHeading asset="stock" size="liff">
+                    <h1 className="text-2xl font-bold tracking-tight text-content-heading">บริการเบิกวัสดุ</h1>
+                </WorkspaceHeading>
                 {operationalNotice ?? deepLinkNoticeSession.notice ? (
                     <div
                         role="status"

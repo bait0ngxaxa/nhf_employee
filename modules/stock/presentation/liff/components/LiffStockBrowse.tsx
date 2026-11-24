@@ -57,12 +57,12 @@ export function LiffStockBrowse({
     return (
         <section aria-labelledby="liff-stock-browse-heading" className="space-y-4">
             <div>
-                <h1
+                <h2
                     id="liff-stock-browse-heading"
                     className="text-xl font-bold tracking-tight text-content-heading"
                 >
                     เลือกวัสดุที่ต้องการเบิก
-                </h1>
+                </h2>
                 <p className="mt-1 text-sm leading-6 text-content-secondary">
                     จำนวนที่แสดงเป็นยอดพร้อมเบิกล่าสุด ระบบจะตรวจอีกครั้งเมื่อส่งคำขอ
                 </p>

@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceHeading } from "@/components/ui/workspace-heading";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -38,12 +39,12 @@ export function AnnouncementManager({ initialState }: { initialState: Announceme
 
     return (
         <section data-navigation-dirty={content !== state.content} data-navigation-submitting={busy} data-navigation-unresolved={Boolean(error)} data-navigation-recovery="ยังยืนยันข้อมูลประกาศไม่ได้ กรุณาคัดลอกข้อความแล้วโหลดข้อมูลล่าสุดเพื่อยืนยันผลก่อนเปลี่ยนหน้า" aria-labelledby="announcement-heading" className="mx-auto max-w-3xl space-y-6 rounded-xl border border-border-subtle bg-surface-raised p-4 sm:p-6">
-            <div className="space-y-2">
-                <h1 id="announcement-heading" className="text-2xl font-bold text-content-heading">จัดการประกาศ</h1>
+            <WorkspaceHeading asset="announcements" className="space-y-2">
+                <h1 data-page-heading tabIndex={-1} id="announcement-heading" className="text-2xl font-bold text-content-heading">จัดการประกาศ</h1>
                 <p className="text-sm leading-6 text-content-muted">ประกาศเดียวสำหรับพนักงานทุกคนบนหน้าหลัก รองรับข้อความภาษาไทยและอังกฤษ</p>
                 <p className="text-sm font-semibold text-content-body">สถานะ: {state.published ? "เผยแพร่แล้ว" : "ยังไม่เผยแพร่"}</p>
                 {state.version > 0 && <p className="text-sm text-content-muted">แก้ไขล่าสุด {new Date(state.updatedAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}</p>}
-            </div>
+            </WorkspaceHeading>
             <div className="space-y-2">
                 <label htmlFor="announcement-content" className="text-sm font-semibold text-content-heading">ข้อความประกาศ</label>
                 <Textarea id="announcement-content" rows={6} maxLength={ANNOUNCEMENT_MAX_LENGTH} value={content} disabled={busy}
