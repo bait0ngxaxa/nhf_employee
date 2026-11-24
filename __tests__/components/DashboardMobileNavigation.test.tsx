@@ -119,7 +119,7 @@ describe("browser mobile navigation", () => {
         const nav = screen.getByRole("navigation");
         expect(nav).toHaveClass("lg:hidden");
         expect(within(nav).getAllByRole("link")).toHaveLength(5);
-        for (const [label, key] of [["งานประจำ", "routine"], ["วัสดุ", "stock"], ["วันลา", "leave"]] as const) {
+        for (const [label, key] of [["งานประจำ", "routine"], ["วัสดุและคลัง", "stock"], ["วันลา — การลา", "leave"]] as const) {
             const image = within(nav).getByRole("link", { name: label }).querySelector("img");
             expect(image?.src).toBe(new URL(VISUAL_ASSETS[key].compactSrc, document.baseURI).href);
             expect(image).toHaveAttribute("alt", "");
@@ -147,6 +147,9 @@ describe("browser mobile navigation", () => {
         vi.mocked(useDashboardDataContext).mockReturnValue({ ...context, availableMenuGroups: DASHBOARD_MENU_GROUPS.slice(1) });
         render(<DashboardBottomNav />);
         const employee = screen.getByRole("link", { name: "ข้อมูลพนักงาน" });
+        expect(within(employee).getByText("พนักงาน", { exact: true })).toBeVisible();
+        expect(screen.getByRole("link", { name: "เพิ่มคน — เพิ่มพนักงาน" })).toBeVisible();
+        expect(screen.getByRole("link", { name: "คำร้องใหม่ — คำร้องพนักงานใหม่" })).toBeVisible();
         const artwork = employee.querySelector("img");
         if (!artwork) throw new Error("Missing employee artwork");
         expect(artwork.src).toBe(new URL(VISUAL_ASSETS["employee-management"].compactSrc, document.baseURI).href);

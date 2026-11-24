@@ -54,6 +54,8 @@ const bundle = await build({
                 if (variant === "none") groups = [];
                 if (variant === "limited") groups = [{ ...groups[0], items: groups[0].items.filter(i => ["stock", "routine"].includes(i.id)) }];
                 if (variant === "admin-only") groups = groups.slice(1);
+                if (variant === "system-only") groups = groups.filter(g => g.id === "system-access");
+                if (variant === "mixed") groups = groups.map(g => ({ ...g, items: g.items.filter(i => ["stock", "audit-logs", "authorization-administration"].includes(i.id)) }));
                 if (variant === "unavailable") groups = groups.map(g => ({ ...g, items: g.items.map(i => i.id === "leave-management" ? { ...i, unavailable: true } : i) }));
                 if (variant === "disabled") groups = getAvailableMenuGroups(false);
                 if (variant === "long") groups = groups.map(g => ({ ...g, items: g.items.map(i => i.id === "routine" ? { ...i, label: "บริการพนักงานและผู้ดูแลระบบที่มีชื่อภาษาไทยยาวมาก", sidebarLabel: "บริการพนักงานและผู้ดูแลระบบที่มีชื่อภาษาไทยยาวมาก" } : i) }));
@@ -185,16 +187,17 @@ async function checkFunctionalIcon(control, icon) {
     assert.equal(await control.locator(`svg.lucide-${icon}[aria-hidden="true"]`).count(), 1);
 }
 
-async function checkBottomNav(nav, brandIds, functionalLinks, { labelsFit = true } = {}) {
+async function checkBottomNav(nav, brandIds, functionalLinks) {
     await checkArtwork(nav, sources(brandIds, "-compact"), 24);
     for (const [name, icon] of functionalLinks) {
         await checkFunctionalIcon(nav.getByRole("link", { name, exact: true }), icon);
     }
-    assert.ok(await nav.getByRole("link").evaluateAll((links, labelsFit) => links.every((link) => {
+    const clipped = await nav.getByRole("link").evaluateAll((links) => links.filter((link) => {
         const box = link.getBoundingClientRect();
         const label = link.lastElementChild;
-        return box.height >= 48 && box.width >= 44 && (!labelsFit || label.scrollWidth <= label.clientWidth);
-    }), labelsFit));
+        return box.height < 48 || box.width < 44 || label.scrollWidth > label.clientWidth;
+    }).map((link) => link.textContent));
+    assert.deepEqual(clipped, [], "Navigation labels fit and touch targets are at least 44 × 48px");
 }
 
 async function checkArtworkFallback(control) {
@@ -205,6 +208,8 @@ async function checkArtworkFallback(control) {
     await image.dispatchEvent("error");
     const fallback = control.locator('svg[aria-hidden="true"]');
     await fallback.waitFor();
+    const glyph = await fallback.boundingBox();
+    assert.ok(glyph.width >= before.width * 0.75 && glyph.width <= before.width * 0.85);
     assert.deepEqual(await fallback.locator("..").boundingBox(), before);
     assert.deepEqual(await control.boundingBox(), controlBox);
     assert.equal(await control.getByRole("img").count(), 0);
@@ -226,7 +231,7 @@ const waitForLinkedCard = (page) => page.getByText("เชื่อมบัญ�
 
 async function checkNavigation() {
     let cases = 0;
-    for (const width of (process.argv[2] ? [Number(process.argv[2])] : [320, 375, 390, 422, 768, 1024, 1440])) {
+    for (const width of (process.argv[2] ? [Number(process.argv[2])] : [320, 360, 375, 390, 422, 430, 768, 1024, 1440])) {
         for (const theme of ["light", "dark"]) {
             const page = await browser.newPage({ viewport: { width, height: 900 } });
             const errors = [];
@@ -246,7 +251,7 @@ async function checkNavigation() {
                     assert.equal(await bottomNav.isVisible(), mobile);
                     if (mobile) {
                         await checkBottomNav(bottomNav, dashboardTabAssets, [["หน้าแรก", "house"], ["เพิ่มเติม", "ellipsis"]]);
-                        const active = { "/dashboard": "หน้าแรก", "/dashboard/more": "เพิ่มเติม", "/dashboard/stock": "วัสดุ" }[path];
+                        const active = { "/dashboard": "หน้าแรก", "/dashboard/more": "เพิ่มเติม", "/dashboard/stock": "วัสดุและคลัง" }[path];
                         assert.equal(await bottomNav.getByRole("link", { name: active, exact: true }).getAttribute("aria-current"), "page");
                         if ([320, 390].includes(width) && path === "/dashboard") {
                             await waitForLinkedCard(page);
@@ -381,7 +386,7 @@ async function checkNavigation() {
                         assert.equal(await page.locator(":focus").evaluate(el => getComputedStyle(el).outlineStyle !== "none" || getComputedStyle(el).boxShadow !== "none"), true);
                         await page.goBack();
                         await page.waitForURL("**/dashboard/stock");
-                        assert.equal(await page.getByRole("link", { name: "วัสดุ", exact: true }).getAttribute("aria-current"), "page");
+                        assert.equal(await page.getByRole("link", { name: "วัสดุและคลัง", exact: true }).getAttribute("aria-current"), "page");
                         await page.goForward();
                         await page.waitForURL("**/dashboard/more");
                         assert.equal(await page.getByRole("link", { name: "เพิ่มเติม", exact: true }).getAttribute("aria-current"), "page");
@@ -418,8 +423,8 @@ async function checkNavigation() {
                 assert.deepEqual(errors, [], `${width} ${theme} ${path}: runtime errors`);
                 cases++;
             }
-            if (width === 320 || width === 390) {
-                for (const [variant, expected] of [["one", 1], ["limited", 2], ["none", 0], ["admin-only", 0], ["disabled", 1], ["long", 4], ["unavailable", 4], ["no-announcement", 4]]) {
+            if ([320, 360, 390, 430].includes(width)) {
+                for (const [variant, expected] of [["one", 1], ["limited", 2], ["none", 0], ["admin-only", 0], ["system-only", 0], ["mixed", 1], ["disabled", 1], ["long", 4], ["unavailable", 4], ["no-announcement", 4]]) {
                     await page.goto(origin + "/dashboard?fixture=" + variant);
                     const grid = page.getByRole("region", { name: "เมนูด่วน" });
                     await grid.waitFor().catch(cause => { throw new Error(`${variant}: ${errors.join(" | ")}`, { cause }); });
@@ -436,12 +441,17 @@ async function checkNavigation() {
                     const bottomNav = page.getByRole("navigation", { name: "เมนูหลักบนมือถือ" });
                     const projectedAssets = {
                         one: ["stock"], limited: ["routine", "stock"], none: [],
-                        "admin-only": menuIds.slice(0, 3), disabled: [],
+                        "admin-only": menuIds.slice(0, 3), "system-only": menuIds.slice(3), disabled: [],
+                        mixed: ["stock", "audit-logs", "authorization-administration"],
                         long: dashboardTabAssets, unavailable: ["routine", "stock", "it-ticket"],
                         "no-announcement": dashboardTabAssets,
                     }[variant];
-                    await checkBottomNav(bottomNav, projectedAssets, [["หน้าแรก", "house"], ["เพิ่มเติม", "ellipsis"]],
-                        { labelsFit: variant !== "admin-only" });
+                    await checkBottomNav(bottomNav, projectedAssets, [["หน้าแรก", "house"], ["เพิ่มเติม", "ellipsis"]]);
+                    if (["admin-only", "system-only", "mixed"].includes(variant)) {
+                        const name = { "admin-only": "ข้อมูลพนักงาน", "system-only": "จัดการประกาศ", mixed: "วัสดุและคลัง" }[variant];
+                        assert.equal(await bottomNav.getByRole("link", { name, exact: true }).count(), 1);
+                        await captureNavigation(page, `${width}-dashboard-nav-${variant}-${theme}.png`);
+                    }
                     if (width === 390 && ["limited", "admin-only"].includes(variant)) {
                         await captureNavigation(page, `390-dashboard-nav-${variant}-${theme}.png`);
                     }
@@ -528,7 +538,7 @@ async function checkNavigation() {
                 await page.goto(`${origin}/dashboard/stock`);
                 if (theme === "dark") await page.evaluate(() => document.documentElement.classList.add("dark"));
                 const nav = page.getByRole("navigation", { name: "เมนูหลักบนมือถือ" });
-                const stock = nav.getByRole("link", { name: "วัสดุ", exact: true });
+                const stock = nav.getByRole("link", { name: "วัสดุและคลัง", exact: true });
                 await checkArtwork(stock, sources(["stock"], "-compact"), 24);
                 assert.equal(await stock.getAttribute("aria-current"), "page");
                 await captureNavigation(page, `390-dashboard-nav-stock-${theme}.png`);

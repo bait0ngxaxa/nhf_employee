@@ -9,6 +9,7 @@ import type { MenuGroup, MenuItem } from "@/types/dashboard";
 export interface DashboardMobileTab {
     id: string;
     label: string;
+    accessibleLabel?: string;
     href: string;
     icon: MenuItem["icon"];
     asset?: MenuItem["asset"];
@@ -20,6 +21,12 @@ const SHORT_LABELS: Readonly<Record<string, string>> = {
     stock: "วัสดุ",
     "leave-management": "วันลา",
     "it-workspace": "IT",
+    "employee-management": "พนักงาน",
+    "add-employee": "เพิ่มคน",
+    "email-request": "คำร้องใหม่",
+    announcements: "ประกาศ",
+    "authorization-administration": "สิทธิ์ใช้งาน",
+    "audit-logs": "บันทึก",
 };
 
 function isKnownITTicketPath(base: string, pathname: string): boolean {
@@ -44,13 +51,19 @@ export function projectDashboardMobileTabs(groups: readonly MenuGroup[]): Dashbo
         && !primary.some((candidate) => candidate.id === item.id));
     return [
         { id: "dashboard", label: "หน้าแรก", href: APP_ROUTES.dashboard, icon: House },
-        ...[...primary, ...remaining].slice(0, 3).map((item) => ({
-            id: item.id,
-            label: SHORT_LABELS[item.id] ?? item.sidebarLabel ?? item.label,
-            href: toDashboardMenuPath(item.id),
-            icon: item.icon,
-            asset: item.asset,
-        })),
+        ...[...primary, ...remaining].slice(0, 3).map((item) => {
+            const fullLabel = item.sidebarLabel ?? item.label;
+            const label = SHORT_LABELS[item.id] ?? fullLabel;
+            return {
+                id: item.id,
+                label,
+                accessibleLabel: label === fullLabel ? undefined
+                    : fullLabel.includes(label) ? fullLabel : `${label} — ${fullLabel}`,
+                href: toDashboardMenuPath(item.id),
+                icon: item.icon,
+                asset: item.asset,
+            };
+        }),
         { id: "more", label: "เพิ่มเติม", href: APP_ROUTES.dashboardMore, icon: MoreHorizontal },
     ];
 }
