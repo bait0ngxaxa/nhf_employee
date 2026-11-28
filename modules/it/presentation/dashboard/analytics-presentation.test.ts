@@ -34,9 +34,6 @@ const response = {
             oldestUnresolvedAgeMinutes: 42,
             newTickets: 0,
             resolvedTickets: 0,
-            firstRespondedTickets: 0,
-            averageFirstResponseMinutes: null,
-            averageResolutionMinutes: null,
         },
         trend: [{ date: "2026-09-26", created: 0, resolved: 0 }],
         statusDistribution: [
@@ -63,12 +60,6 @@ const response = {
             { priority: "P1", count: 0 },
             { priority: "P2", count: 1 },
             { priority: "P3", count: 0 },
-        ],
-        responseResolutionByPriority: [
-            { priority: "P0", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
-            { priority: "P1", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
-            { priority: "P2", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
-            { priority: "P3", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
         ],
         topCategories: {
             limit: 10,
@@ -97,7 +88,7 @@ describe("IT analytics presentation contract", () => {
         expect(parseITAnalyticsDashboardResponse(response)).toMatchObject({
             timeZone: "Asia/Bangkok",
             period: { key: "30D" },
-            summary: { currentBacklog: 1, averageResolutionMinutes: null },
+            summary: { currentBacklog: 1, resolvedTickets: 0, oldestUnresolvedAgeMinutes: 42 },
             trend: [{ date: "2026-09-26", created: 0, resolved: 0 }],
         });
     });
@@ -150,6 +141,13 @@ describe("IT analytics presentation contract", () => {
             const { agedBacklog: _removed, ...summary } = value.dashboard.summary;
             Object.assign(value.dashboard, { summary });
         }],
+        ["a missing resolved Ticket count", (value: typeof response) => {
+            const { resolvedTickets: _removed, ...summary } = value.dashboard.summary;
+            Object.assign(value.dashboard, { summary });
+        }],
+        ["an invalid oldest unresolved age", (value: typeof response) => {
+            Object.assign(value.dashboard.summary, { oldestUnresolvedAgeMinutes: Infinity });
+        }],
         ["a negative high-priority count", (value: typeof response) => {
             value.dashboard.summary.highPriorityBacklog = -1;
         }],
@@ -167,7 +165,7 @@ describe("IT analytics presentation contract", () => {
         expect(parseITAnalyticsDashboardResponse(leaking)).toBeNull();
     });
 
-    it("formats durations after rounding and distinguishes missing samples from zero", () => {
+    it("formats backlog age, including rounding and an unavailable value", () => {
         expect(formatITAnalyticsDuration(null)).toBe("ยังไม่มีข้อมูล");
         expect(formatITAnalyticsDuration(42)).toBe("42 นาที");
         expect(formatITAnalyticsDuration(138)).toBe("2 ชม. 18 นาที");

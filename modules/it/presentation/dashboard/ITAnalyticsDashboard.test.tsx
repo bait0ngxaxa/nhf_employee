@@ -49,9 +49,6 @@ function dashboardPayload(period: string, backlog: number): unknown {
                 oldestUnresolvedAgeMinutes: 138,
                 newTickets: backlog + 1,
                 resolvedTickets: 2,
-                firstRespondedTickets: 3,
-                averageFirstResponseMinutes: 138,
-                averageResolutionMinutes: null,
             },
             trend: [
                 { date: "2026-09-25", created: backlog, resolved: 1 },
@@ -81,12 +78,6 @@ function dashboardPayload(period: string, backlog: number): unknown {
                 { priority: "P1", count: 1 },
                 { priority: "P2", count: backlog },
                 { priority: "P3", count: 0 },
-            ],
-            responseResolutionByPriority: [
-                { priority: "P0", firstRespondedTickets: 1, averageFirstResponseMinutes: 20, resolvedTickets: 0, averageResolutionMinutes: null },
-                { priority: "P1", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 1, averageResolutionMinutes: 35 },
-                { priority: "P2", firstRespondedTickets: 2, averageFirstResponseMinutes: 60, resolvedTickets: 1, averageResolutionMinutes: 75 },
-                { priority: "P3", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
             ],
             topCategories: {
                 limit: 10,
@@ -170,10 +161,11 @@ describe("IT analytics Dashboard presentation", () => {
         expect(card("งานเร่งด่วน")).toHaveTextContent("P0P1");
         expect(card("งานเร่งด่วน")).toHaveTextContent("2");
         expect(card("งานเร่งด่วน")).toHaveTextContent("P0 1 · P1 1 ที่ยังไม่แก้ไข");
-        expect(within(overview).getByText("ตอบกลับครั้งแรกเฉลี่ย")).toBeInTheDocument();
-        expect(within(overview).getByText("2 ชม. 18 นาที")).toBeInTheDocument();
+        expect(within(overview).getAllByRole("term")).toHaveLength(6);
+        expect(within(overview).getByText("ยังไม่มีผู้รับผิดชอบ")).toBeInTheDocument();
+        expect(screen.queryByText("ตอบกลับครั้งแรกเฉลี่ย")).not.toBeInTheDocument();
+        expect(screen.queryByText("เวลาแก้ไขเฉลี่ย")).not.toBeInTheDocument();
         expect(within(overview).getByText("ยังไม่ประเมิน Priority")).toBeInTheDocument();
-        expect(within(overview).getByText("ยังไม่มีข้อมูล")).toBeInTheDocument();
 
         expect(screen.getByRole("heading", { name: "รายงาน IT" })).toBeInTheDocument();
         expect(screen.getByText(/เวลาเอเชีย\/กรุงเทพฯ/)).toBeInTheDocument();
@@ -198,7 +190,6 @@ describe("IT analytics Dashboard presentation", () => {
             "อายุงานค้าง",
             "สิ่งที่ต้องติดตาม",
             "งานค้างตามผู้รับผิดชอบ",
-            "ประสิทธิภาพการให้บริการ",
             "แนวโน้ม Ticket ใหม่และแก้ไขแล้ว",
             "สถานะ Ticket ปัจจุบัน",
         ]);
@@ -234,9 +225,7 @@ describe("IT analytics Dashboard presentation", () => {
         expect(workload).toHaveTextContent("ไม่ใช่ตัวชี้วัดผลการทำงาน");
         expect(within(workload).getByRole("meter", { name: "ยังไม่มีผู้รับผิดชอบ 1 รายการ" })).toBeInTheDocument();
 
-        const performance = screen.getByRole("region", { name: "ประสิทธิภาพการให้บริการ" });
-        expect(within(performance).getByRole("table")).toHaveTextContent("1 ชม. 15 นาที");
-        expect(performance).toHaveTextContent("Priority ใหม่");
+        expect(screen.queryByRole("region", { name: "ประสิทธิภาพการให้บริการ" })).not.toBeInTheDocument();
     });
 
     it("never renders Ticket links for analytics-only viewers", async () => {
@@ -275,7 +264,7 @@ describe("IT analytics Dashboard presentation", () => {
             .getByText("ไม่ระบุหน่วยงาน")).toBeInTheDocument();
     });
 
-    it("shows zero data as valid empty states without inventing averages", async () => {
+    it("shows zero data as valid empty states", async () => {
         const empty = dashboardPayload("30D", 0) as {
             dashboard: Record<string, unknown>;
         };
@@ -290,9 +279,6 @@ describe("IT analytics Dashboard presentation", () => {
                 oldestUnresolvedAgeMinutes: null,
                 newTickets: 0,
                 resolvedTickets: 0,
-                firstRespondedTickets: 0,
-                averageFirstResponseMinutes: null,
-                averageResolutionMinutes: null,
             },
             trend: Array.from({ length: 30 }, (_, index) => ({
                 date: `2026-09-${String(index + 1).padStart(2, "0")}`,
@@ -305,12 +291,6 @@ describe("IT analytics Dashboard presentation", () => {
                 { priority: "P2", count: 0 },
                 { priority: "P3", count: 0 },
             ],
-            responseResolutionByPriority: [
-                { priority: "P0", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
-                { priority: "P1", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
-                { priority: "P2", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
-                { priority: "P3", firstRespondedTickets: 0, averageFirstResponseMinutes: null, resolvedTickets: 0, averageResolutionMinutes: null },
-            ],
             topCategories: { limit: 10, rows: [], otherCategoryCount: 0, otherTicketCount: 0 },
             categoryBacklog: [],
             assigneeBacklog: [],
@@ -322,7 +302,6 @@ describe("IT analytics Dashboard presentation", () => {
 
         const overview = await screen.findByRole("region", { name: "ภาพรวม" });
         expect(within(overview).getByText("ไม่มีงานค้าง")).toBeInTheDocument();
-        expect(within(overview).getAllByText("ยังไม่มีข้อมูล")).toHaveLength(2);
         expect(screen.queryByText("0 นาที")).not.toBeInTheDocument();
         expect(within(screen.getByRole("region", { name: "หมวดปัญหาที่มีการแจ้งมากที่สุด" }))
             .getByRole("status")).toHaveTextContent("ยังไม่มี Ticket ที่สร้างในช่วงเวลานี้");

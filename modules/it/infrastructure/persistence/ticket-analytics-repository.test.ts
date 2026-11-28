@@ -40,18 +40,8 @@ describe("IT Ticket analytics persistence", () => {
             _min: { createdAt: new Date("2026-08-01T00:00:00.000Z") },
         });
         const count = vi.fn().mockResolvedValue(1);
-        const findMany = vi.fn()
-            .mockResolvedValueOnce([{
-                priority: "P0",
-                createdAt: new Date("2026-09-02T00:00:00.000Z"),
-                firstRespondedAt: new Date("2026-09-02T00:20:00.000Z"),
-            }])
-            .mockResolvedValueOnce([{ createdAt: new Date("2026-09-02T00:00:00.000Z") }])
-            .mockResolvedValueOnce([{
-                id: 41,
-                createdAt: new Date("2026-09-01T12:00:00.000Z"),
-                priority: "P0",
-            }]);
+        const createdAt = new Date("2026-09-02T00:00:00.000Z");
+        const findMany = vi.fn().mockResolvedValue([{ createdAt }]);
         const createdCategoryGroupBy = vi.fn().mockResolvedValue([
             { categoryId: 19, _count: { _all: 1 } },
         ]);
@@ -139,19 +129,18 @@ describe("IT Ticket analytics persistence", () => {
         });
         // No aging ranges requested: no extra unbounded counts.
         expect(count).toHaveBeenCalledTimes(2);
-        expect(findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
-            where: {
-                createdAt: { gte: startAt, lt: endAt },
-                firstRespondedAt: { not: null },
-            },
-            select: { priority: true, createdAt: true, firstRespondedAt: true },
-        }));
-        expect(result.resolvedEvents).toHaveLength(1);
+        expect(findMany).toHaveBeenCalledExactlyOnceWith({
+            where: { createdAt: { gte: startAt, lt: endAt } },
+            select: { createdAt: true },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        });
+        expect(result.createdAtValues).toEqual([createdAt]);
+        expect(result.resolvedEvents).toEqual([
+            { ticketId: 41, occurredAt: new Date("2026-09-02T01:00:00.000Z") },
+        ]);
         expect(result.priorities).toEqual([{ priority: "P0", count: 1 }]);
         expect(result.backlogPriorities).toEqual([{ priority: "P0", count: 1 }]);
         expect(result.untriagedBacklogCount).toBe(1);
-        expect(result.firstResponses[0]).toMatchObject({ priority: "P0" });
-        expect(result.resolvedTickets[0]).toMatchObject({ priority: "P0" });
         expect(result.categories).toEqual([{
             id: 19,
             name: "หมวดประวัติ",
@@ -223,9 +212,12 @@ describe("IT Ticket analytics persistence", () => {
             },
             _min: { occurredAt: true },
         });
-        expect(findMany).toHaveBeenCalledTimes(2); // First-response and created timestamps only.
+        expect(findMany).toHaveBeenCalledExactlyOnceWith({
+            where: { ...scope, createdAt: { gte: startAt, lt: endAt } },
+            select: { createdAt: true },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        });
         expect(result.resolvedEvents).toEqual([]);
-        expect(result.resolvedTickets).toEqual([]);
         expect(count).toHaveBeenCalledTimes(2); // period and untriaged only
         expect(queryRaw).toHaveBeenCalledTimes(1);
         const statement = queryRaw.mock.calls[0]?.[0];

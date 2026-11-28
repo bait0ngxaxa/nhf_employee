@@ -65,21 +65,9 @@ export interface ITAnalyticsDepartmentCount {
     readonly count: number;
 }
 
-export interface ITAnalyticsFirstResponseSample {
-    readonly priority: ITTicketPriority;
-    readonly createdAt: Date;
-    readonly firstRespondedAt: Date;
-}
-
 export interface ITAnalyticsResolvedEvent {
     readonly ticketId: number;
     readonly occurredAt: Date | null;
-}
-
-export interface ITAnalyticsResolvedTicket {
-    readonly id: number;
-    readonly createdAt: Date;
-    readonly priority: ITTicketPriority;
 }
 
 export interface ITAnalyticsCategoryName {
@@ -105,10 +93,8 @@ export interface ITAnalyticsPersistenceSnapshot {
     readonly backlogOldestCreatedAt: Date | null;
     readonly departmentSnapshots: readonly ITAnalyticsDepartmentCount[];
     readonly newTicketCount: number;
-    readonly firstResponses: readonly ITAnalyticsFirstResponseSample[];
     readonly createdAtValues: readonly Date[];
     readonly resolvedEvents: readonly ITAnalyticsResolvedEvent[];
-    readonly resolvedTickets: readonly ITAnalyticsResolvedTicket[];
     /** Period-created Tickets grouped by current category identity. */
     readonly createdCategories: readonly ITAnalyticsCategoryCount[];
     readonly backlogAges: readonly ITAnalyticsBacklogAgeCount[];
@@ -197,13 +183,6 @@ export async function readITAnalyticsPersistenceSnapshot(
         _count: { _all: true },
     });
     const newTicketCount = await tx.iTTicket.count({ where: periodWhere });
-    const firstResponseRows = await tx.iTTicket.findMany({
-        where: {
-            ...periodWhere,
-            firstRespondedAt: { not: null },
-        },
-        select: { priority: true, createdAt: true, firstRespondedAt: true },
-    });
     const createdRows = await tx.iTTicket.findMany({
         where: periodWhere,
         select: { createdAt: true },
@@ -219,13 +198,6 @@ export async function readITAnalyticsPersistenceSnapshot(
         },
         _min: { occurredAt: true },
     });
-    const resolvedIds = resolutionGroups.map((group) => group.ticketId);
-    const resolvedTickets = resolvedIds.length === 0
-        ? []
-        : await tx.iTTicket.findMany({
-            where: { id: { in: resolvedIds } },
-            select: { id: true, createdAt: true, priority: true },
-        });
     const createdCategoryGroups = await tx.iTTicket.groupBy({
         by: ["categoryId"],
         where: periodWhere,
@@ -295,24 +267,10 @@ export async function readITAnalyticsPersistenceSnapshot(
             count: countOf(group),
         })),
         newTicketCount,
-        firstResponses: firstResponseRows.flatMap((row) =>
-            row.firstRespondedAt === null
-                ? []
-                : [{
-                    priority: row.priority,
-                    createdAt: row.createdAt,
-                    firstRespondedAt: row.firstRespondedAt,
-                }],
-        ),
         createdAtValues: createdRows.map((row) => row.createdAt),
         resolvedEvents: resolutionGroups.map((group) => ({
             ticketId: group.ticketId,
             occurredAt: group._min.occurredAt,
-        })),
-        resolvedTickets: resolvedTickets.map((ticket) => ({
-            id: ticket.id,
-            createdAt: ticket.createdAt,
-            priority: ticket.priority,
         })),
         createdCategories: createdCategoryGroups.map((group) => ({
             categoryId: group.categoryId,

@@ -103,13 +103,6 @@ function parseITAnalyticsDashboardQuery(
     };
 }
 
-function averageMinutes(durationsMs: readonly number[]): number | null {
-    if (durationsMs.length === 0) return null;
-    return durationsMs.reduce((total, duration) => total + duration, 0)
-        / durationsMs.length
-        / 60_000;
-}
-
 function sortedLabels(
     counts: ReadonlyMap<string, number>,
 ): readonly { readonly label: string; readonly count: number }[] {
@@ -358,43 +351,6 @@ export async function getITAnalyticsDashboard(
             if (bucket) bucket.resolved += 1;
         }
 
-        const firstResponseDurationsByPriority = new Map(
-            IT_TICKET_PRIORITY_OPTIONS.map(({ value }) => [value, [] as number[]]),
-        );
-        for (const sample of persistence.firstResponses) {
-            firstResponseDurationsByPriority.get(sample.priority)?.push(
-                sample.firstRespondedAt.getTime() - sample.createdAt.getTime(),
-            );
-        }
-        const resolvedTicketById = new Map(
-            persistence.resolvedTickets.map((ticket) => [ticket.id, ticket]),
-        );
-        const resolutionDurationsByPriority = new Map(
-            IT_TICKET_PRIORITY_OPTIONS.map(({ value }) => [value, [] as number[]]),
-        );
-        const resolutionDurations: number[] = [];
-        for (const event of persistence.resolvedEvents) {
-            if (event.occurredAt === null) continue;
-            const ticket = resolvedTicketById.get(event.ticketId);
-            if (!ticket) continue;
-            const duration = event.occurredAt.getTime() - ticket.createdAt.getTime();
-            resolutionDurations.push(duration);
-            resolutionDurationsByPriority.get(ticket.priority)?.push(duration);
-        }
-        const firstResponseDurations = persistence.firstResponses.map((sample) =>
-            sample.firstRespondedAt.getTime() - sample.createdAt.getTime(),
-        );
-        const responseResolutionByPriority = IT_TICKET_PRIORITY_OPTIONS.map(({ value }) => {
-            const firstResponseDurations = firstResponseDurationsByPriority.get(value) ?? [];
-            const priorityResolutionDurations = resolutionDurationsByPriority.get(value) ?? [];
-            return {
-                priority: value,
-                firstRespondedTickets: firstResponseDurations.length,
-                averageFirstResponseMinutes: averageMinutes(firstResponseDurations),
-                resolvedTickets: priorityResolutionDurations.length,
-                averageResolutionMinutes: averageMinutes(priorityResolutionDurations),
-            };
-        });
         const backlogByStatus = new Map(
             persistence.statuses.map((row) => [row.status, row.count]),
         );
@@ -449,9 +405,6 @@ export async function getITAnalyticsDashboard(
                     ),
                 newTickets: persistence.newTicketCount,
                 resolvedTickets: persistence.resolvedEvents.length,
-                firstRespondedTickets: persistence.firstResponses.length,
-                averageFirstResponseMinutes: averageMinutes(firstResponseDurations),
-                averageResolutionMinutes: averageMinutes(resolutionDurations),
             },
             trend: bounds.dates.map((date) => ({
                 date,
@@ -461,7 +414,6 @@ export async function getITAnalyticsDashboard(
             typeDistribution,
             priorityDistribution,
             priorityBacklog,
-            responseResolutionByPriority,
             topCategories: {
                 limit: IT_ANALYTICS_TOP_CATEGORY_LIMIT,
                 rows: topCategoryRows.map((row) => ({

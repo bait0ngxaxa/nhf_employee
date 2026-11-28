@@ -176,17 +176,7 @@ function KpiSummary({ dashboard }: { readonly dashboard: ITAnalyticsDashboardDTO
                     detail={`P0 ${formatITAnalyticsCount(priorityCount("P0"))} · P1 ${formatITAnalyticsCount(priorityCount("P1"))} ที่ยังไม่แก้ไข`}
                 />
             </dl>
-            <dl className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-4 rounded-xl border border-border-neutral bg-surface-subtle px-4 py-4 sm:px-5 lg:grid-cols-4">
-                <SecondaryMetric
-                    label="ตอบกลับครั้งแรกเฉลี่ย"
-                    value={formatITAnalyticsDuration(summary.averageFirstResponseMinutes)}
-                    detail={`จาก ${formatITAnalyticsCount(summary.firstRespondedTickets)} Ticket ใหม่ที่ตอบแล้ว`}
-                />
-                <SecondaryMetric
-                    label="เวลาแก้ไขเฉลี่ย"
-                    value={formatITAnalyticsDuration(summary.averageResolutionMinutes)}
-                    detail={`จาก ${formatITAnalyticsCount(summary.resolvedTickets)} Ticket ที่แก้ไขในช่วงนี้`}
-                />
+            <dl className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-4 rounded-xl border border-border-neutral bg-surface-subtle px-4 py-4 sm:px-5">
                 <SecondaryMetric
                     label="ยังไม่มีผู้รับผิดชอบ"
                     value={formatITAnalyticsCount(summary.unassignedBacklog)}
@@ -334,82 +324,6 @@ function AttentionPanel({
     );
 }
 
-function ServicePerformancePanel({ dashboard }: { readonly dashboard: ITAnalyticsDashboardDTO }): ReactElement {
-    const { summary, responseResolutionByPriority: rows } = dashboard;
-    return (
-        <ITAnalyticsPanel
-            title="ประสิทธิภาพการให้บริการ"
-            scope="period"
-            description="เวลาตามนาฬิกาจริง ไม่หักวันหยุดหรือนอกเวลาทำการ และไม่ใช่การวัด SLA"
-        >
-            <dl className="grid min-w-0 gap-4 sm:grid-cols-2">
-                <div className="min-w-0 rounded-lg bg-surface-subtle p-4">
-                    <dt className="text-sm font-medium text-content-secondary">ตอบกลับครั้งแรกเฉลี่ย</dt>
-                    <dd className="mt-1 text-2xl font-semibold tabular-nums text-content-heading">
-                        {formatITAnalyticsDuration(summary.averageFirstResponseMinutes)}
-                    </dd>
-                    <dd className="mt-1 text-xs leading-5 text-content-secondary">
-                        จาก <span className="tabular-nums">{formatITAnalyticsCount(summary.firstRespondedTickets)}</span> Ticket ที่สร้างในช่วงรายงานและได้รับการตอบกลับแล้ว
-                    </dd>
-                </div>
-                <div className="min-w-0 rounded-lg bg-surface-subtle p-4">
-                    <dt className="text-sm font-medium text-content-secondary">เวลาแก้ไขเฉลี่ย</dt>
-                    <dd className="mt-1 text-2xl font-semibold tabular-nums text-content-heading">
-                        {formatITAnalyticsDuration(summary.averageResolutionMinutes)}
-                    </dd>
-                    <dd className="mt-1 text-xs leading-5 text-content-secondary">
-                        จาก <span className="tabular-nums">{formatITAnalyticsCount(summary.resolvedTickets)}</span> Ticket ที่แก้ไขในช่วงรายงาน นับจากเวลาสร้างถึงการแก้ไขครั้งแรกในช่วง
-                    </dd>
-                </div>
-            </dl>
-            <h3 className="mt-6 text-base font-semibold text-content-heading">แยกตาม Priority ปัจจุบัน</h3>
-            <p className="mt-1 text-sm leading-6 text-content-secondary">
-                หากมีการเปลี่ยน Priority ภายหลัง ข้อมูลย้อนหลังของ Ticket นั้นจะย้ายไปอยู่ในกลุ่ม Priority ใหม่
-            </p>
-            <div className="mt-3 hidden overflow-x-auto rounded-lg border border-border-neutral sm:block">
-                <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
-                    <caption className="sr-only">เวลาตอบกลับและแก้ไขตาม Priority ปัจจุบัน</caption>
-                    <thead className="bg-surface-subtle text-xs font-semibold text-content-secondary">
-                        <tr>
-                            <th scope="col" className="px-3 py-3">Priority</th>
-                            <th scope="col" className="px-3 py-3 text-right">ตอบแล้ว</th>
-                            <th scope="col" className="px-3 py-3">ตอบกลับครั้งแรกเฉลี่ย</th>
-                            <th scope="col" className="px-3 py-3 text-right">แก้ไขแล้ว</th>
-                            <th scope="col" className="px-3 py-3">เวลาแก้ไขเฉลี่ย</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border-neutral">
-                        {rows.map((row) => (
-                            <tr key={row.priority}>
-                                <th scope="row" className="px-3 py-3 font-semibold text-content-heading">
-                                    {IT_TICKET_PRIORITY_LABELS[row.priority]}
-                                </th>
-                                <td className="px-3 py-3 text-right tabular-nums">{formatITAnalyticsCount(row.firstRespondedTickets)}</td>
-                                <td className="px-3 py-3">{formatITAnalyticsDuration(row.averageFirstResponseMinutes)}</td>
-                                <td className="px-3 py-3 text-right tabular-nums">{formatITAnalyticsCount(row.resolvedTickets)}</td>
-                                <td className="px-3 py-3">{formatITAnalyticsDuration(row.averageResolutionMinutes)}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-            <ul aria-label="เวลาตอบกลับและแก้ไขตาม Priority ปัจจุบัน" className="mt-3 divide-y divide-border-neutral rounded-lg border border-border-neutral sm:hidden">
-                {rows.map((row) => (
-                    <li key={row.priority} className="px-3 py-3">
-                        <p className="text-sm font-semibold text-content-heading">{IT_TICKET_PRIORITY_LABELS[row.priority]}</p>
-                        <dl className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-xs leading-5">
-                            <dt className="text-content-secondary">ตอบกลับเฉลี่ย ({formatITAnalyticsCount(row.firstRespondedTickets)})</dt>
-                            <dd className="text-right text-content-body">{formatITAnalyticsDuration(row.averageFirstResponseMinutes)}</dd>
-                            <dt className="text-content-secondary">แก้ไขเฉลี่ย ({formatITAnalyticsCount(row.resolvedTickets)})</dt>
-                            <dd className="text-right text-content-body">{formatITAnalyticsDuration(row.averageResolutionMinutes)}</dd>
-                        </dl>
-                    </li>
-                ))}
-            </ul>
-        </ITAnalyticsPanel>
-    );
-}
-
 function BreakdownPanel({ dashboard }: { readonly dashboard: ITAnalyticsDashboardDTO }): ReactElement {
     const [selectedBreakdown, setSelectedBreakdown] = useState<BreakdownDimension>("status");
     const breakdowns: Readonly<Record<BreakdownDimension, {
@@ -550,7 +464,6 @@ export function ITAnalyticsReport({
                     unassignedHref={navigation?.unassignedHref}
                 />
             </div>
-            <ServicePerformancePanel dashboard={dashboard} />
             <ITAnalyticsTrendChart trend={dashboard.trend} period={dashboard.period.key} />
             <BreakdownPanel dashboard={dashboard} />
         </div>

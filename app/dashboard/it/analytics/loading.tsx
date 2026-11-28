@@ -12,7 +12,7 @@ export default function ITAnalyticsLoading(): ReactElement {
             <Skeleton className="h-9 w-52" />
             <Skeleton className="h-11 w-full max-w-sm" />
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {Array.from({ length: 7 }, (_, index) => (
+                {Array.from({ length: 4 }, (_, index) => (
                     <Skeleton key={index} className="h-28 w-full rounded-xl" />
                 ))}
             </div>

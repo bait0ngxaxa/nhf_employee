@@ -67,12 +67,10 @@ const bundle = await build({
                 filterOptions: { categories: names.map((name, index) => ({ id: index + 1, key: "K" + index, name, isActive: index !== 9 })) },
                 summary: empty ? {
                     currentBacklog: 0, waitingRequester: 0, unassignedBacklog: 0, untriagedBacklog: 0, highPriorityBacklog: 0,
-                    agedBacklog: 0, oldestUnresolvedAgeMinutes: null, newTickets: 0, resolvedTickets: 0, firstRespondedTickets: 0,
-                    averageFirstResponseMinutes: null, averageResolutionMinutes: null,
+                    agedBacklog: 0, oldestUnresolvedAgeMinutes: null, newTickets: 0, resolvedTickets: 0,
                 } : {
                     currentBacklog: 64, waitingRequester: 6, unassignedBacklog: 9, untriagedBacklog: 5, highPriorityBacklog: 11,
-                    agedBacklog: 14, oldestUnresolvedAgeMinutes: 38_000, newTickets: 296, resolvedTickets: 271, firstRespondedTickets: 280,
-                    averageFirstResponseMinutes: 47.4, averageResolutionMinutes: 1_710,
+                    agedBacklog: 14, oldestUnresolvedAgeMinutes: 38_000, newTickets: 296, resolvedTickets: 271,
                 },
                 trend,
                 statusDistribution: ["OPEN", "IN_PROGRESS", "WAITING_REQUESTER", "RESOLVED", "CLOSED", "CANCELLED"]
@@ -80,12 +78,6 @@ const bundle = await build({
                 typeDistribution: ["INCIDENT", "SERVICE_REQUEST", "SUGGESTION"].map((type, index) => ({ type, count: empty ? 0 : [180, 104, 12][index] })),
                 priorityDistribution: priorities.map((priority, index) => ({ priority, count: empty ? 0 : [12, 40, 220, 53][index] })),
                 priorityBacklog: priorities.map((priority, index) => ({ priority, count: empty ? 0 : [3, 8, 41, 12][index] })),
-                responseResolutionByPriority: priorities.map((priority, index) => ({
-                    priority, firstRespondedTickets: empty ? 0 : [10, 38, 190, 42][index],
-                    averageFirstResponseMinutes: empty || index === 3 ? null : [6, 18, 52, 0][index],
-                    resolvedTickets: empty ? 0 : [9, 35, 180, 47][index],
-                    averageResolutionMinutes: empty ? null : [95, 410, 1_900, 4_200][index],
-                })),
                 topCategories: { limit: 10, rows: rows.slice(0, 10), otherCategoryCount: empty ? 0 : 1, otherTicketCount: empty ? 0 : 6 },
                 backlogAging: [["0_1", 22], ["2_3", 15], ["4_7", 13], ["8_14", 9], ["15_PLUS", 5]].map(([bucket, count]) => ({ bucket, count: empty ? 0 : count })),
                 categoryBacklog: empty ? [] : [{ label: "เครือข่ายและอินเทอร์เน็ต", count: 20 }, { label: "ยังไม่จัดหมวดหมู่", count: 9 }],
@@ -189,12 +181,23 @@ try {
                             .slice(0, 3)
                             .map((element) => `${element.tagName}.${String(element.className).slice(0, 60)}`),
                         sections: document.querySelectorAll("main section").length,
+                        kpiGroups: [...document.querySelectorAll('[aria-labelledby="it-analytics-overview-title"] > dl')]
+                            .map((group) => ({
+                                metrics: group.querySelectorAll("dt").length,
+                                columns: getComputedStyle(group).gridTemplateColumns.split(" ").length,
+                            })),
+                        hasDurationMetrics: /ตอบกลับครั้งแรกเฉลี่ย|เวลาแก้ไขเฉลี่ย|ประสิทธิภาพการให้บริการ/.test(document.querySelector("main").textContent),
                         smallTargets: [...document.querySelectorAll("main a, main button")]
                             .filter((element) => element.getBoundingClientRect().height < 36)
                             .map((element) => element.textContent),
                     }));
                     assert.equal(layout.overflow, false, `page must not overflow horizontally: ${layout.overflowing.join(", ")}`);
-                    assert.ok(layout.sections >= 8, "every report section must render");
+                    assert.ok(layout.sections >= 8, "every remaining report section must render");
+                    assert.deepEqual(layout.kpiGroups, [
+                        { metrics: 4, columns: width >= 1024 ? 4 : 2 },
+                        { metrics: 2, columns: 2 },
+                    ], "both KPI groups must fill their grid");
+                    assert.equal(layout.hasDurationMetrics, false, "duration metrics must be absent");
                     assert.deepEqual(layout.smallTargets, [], "interactive targets must stay touch-sized");
                     if (variant !== "empty") {
                         // Below 640px the ranked list replaces the category chart by design.

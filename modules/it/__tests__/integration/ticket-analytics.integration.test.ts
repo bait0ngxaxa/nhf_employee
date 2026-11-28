@@ -6,8 +6,10 @@ import { prisma } from "@/lib/db/prisma";
 import {
     buildITAuthorizationContext,
     getITAnalyticsDashboard,
+    getITOperatorTicket,
     ITCapabilityDeniedError,
     ITWorkforceDeniedError,
+    listITOperatorTickets,
     type ITAuthorizationContext,
 } from "@/modules/it";
 
@@ -35,7 +37,6 @@ interface TicketInput {
     readonly triagedAt?: Date | null;
     readonly triagedByUserId?: number | null;
     readonly createdAt: Date;
-    readonly firstRespondedAt?: Date | null;
     readonly assignedToUserId?: number | null;
     readonly categoryId?: number | null;
     readonly requesterDepartmentId?: number | null;
@@ -231,7 +232,6 @@ async function createTicket(input: TicketInput): Promise<number> {
             categoryId: input.categoryId ?? null,
             requesterDepartmentId: input.requesterDepartmentId ?? null,
             requesterDepartmentNameSnapshot: input.requesterDepartmentNameSnapshot ?? null,
-            firstRespondedAt: input.firstRespondedAt ?? null,
             createdAt: input.createdAt,
             updatedAt: input.updatedAt ?? input.createdAt,
         },
@@ -317,7 +317,6 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             categoryId: category.id,
             requesterDepartmentId: oldDepartmentId,
             requesterDepartmentNameSnapshot: "ฝ่ายเดิม ณ วันสร้าง",
-            firstRespondedAt: new Date(periodStart.getTime() + 42 * 60_000),
         });
         await createTicket({
             requester,
@@ -329,7 +328,6 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             categoryId: category.id,
             requesterDepartmentId: oldDepartmentId,
             requesterDepartmentNameSnapshot: "ฝ่ายเดิม ณ วันสร้าง",
-            firstRespondedAt: new Date("2026-09-25T17:01:59.000Z"),
         });
         const inProgressTicket = await createTicket({
             requester,
@@ -454,9 +452,6 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             ),
             newTickets: 6,
             resolvedTickets: 2,
-            firstRespondedTickets: 2,
-            averageFirstResponseMinutes: 22,
-            averageResolutionMinutes: 60.5,
         });
         expect(dashboard.backlogAging).toEqual([
             { bucket: "0_1", count: 3 },
@@ -506,36 +501,6 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             { priority: "P1", count: 1 },
             { priority: "P2", count: 2 },
             { priority: "P3", count: 1 },
-        ]);
-        expect(dashboard.responseResolutionByPriority).toEqual([
-            {
-                priority: "P0",
-                firstRespondedTickets: 1,
-                averageFirstResponseMinutes: 42,
-                resolvedTickets: 0,
-                averageResolutionMinutes: null,
-            },
-            {
-                priority: "P1",
-                firstRespondedTickets: 1,
-                averageFirstResponseMinutes: 2,
-                resolvedTickets: 1,
-                averageResolutionMinutes: 60,
-            },
-            {
-                priority: "P2",
-                firstRespondedTickets: 0,
-                averageFirstResponseMinutes: null,
-                resolvedTickets: 0,
-                averageResolutionMinutes: null,
-            },
-            {
-                priority: "P3",
-                firstRespondedTickets: 0,
-                averageFirstResponseMinutes: null,
-                resolvedTickets: 1,
-                averageResolutionMinutes: 61,
-            },
         ]);
         expect(dashboard.categoryBacklog).toContainEqual({
             label: "หมวดหมู่ที่ปิดใช้งานแล้ว",
@@ -889,13 +854,13 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
         const scope = { type: "INCIDENT", category: String(category.id) };
         const weekly = await getITAnalyticsDashboard(viewer.context, { ...scope, period: "7D" }, NOW);
         const monthly = await getITAnalyticsDashboard(viewer.context, { ...scope, period: "30D" }, NOW);
-        expect(weekly.summary).toMatchObject({ resolvedTickets: 1, currentBacklog: 1, averageResolutionMinutes: 49 * 24 * 60 });
-        expect(monthly.summary).toMatchObject({ resolvedTickets: 1, averageResolutionMinutes: 26 * 24 * 60 });
+        expect(weekly.summary).toMatchObject({ resolvedTickets: 1, currentBacklog: 1 });
+        expect(monthly.summary).toMatchObject({ resolvedTickets: 1 });
         expect(weekly.trend.filter(({ resolved }) => resolved > 0)).toMatchObject([{ date: "2026-09-20", resolved: 1 }]);
         expect(monthly.trend.filter(({ resolved }) => resolved > 0)).toMatchObject([{ date: "2026-08-28", resolved: 1 }]);
         const uncategorizedScope = { type: "INCIDENT", category: "uncategorized" };
         const zero = await getITAnalyticsDashboard(viewer.context, { ...uncategorizedScope, period: "7D" }, NOW);
-        expect(zero.summary).toMatchObject({ resolvedTickets: 0, averageResolutionMinutes: null });
+        expect(zero.summary).toMatchObject({ resolvedTickets: 0 });
 
         await prisma.iTTicketEvent.createMany({
             data: Array.from({ length: 512 }, (_, offset) => ({
@@ -930,7 +895,7 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
         await createResolvedEvent(historicallyResolved, viewer.userId, earlier);
         const input = { period: "7D", type: "INCIDENT", category: "uncategorized" };
         const baseline = await getITAnalyticsDashboard(viewer.context, input, NOW);
-        expect(baseline.summary).toMatchObject({ resolvedTickets: 1, currentBacklog: 1, averageResolutionMinutes: 60 });
+        expect(baseline.summary).toMatchObject({ resolvedTickets: 1, currentBacklog: 1 });
 
         const transaction = prisma.$transaction.bind(prisma);
         const spy = vi.spyOn(prisma, "$transaction").mockImplementationOnce(async (read, options) => {
@@ -961,9 +926,9 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             spy.mockRestore();
         }
         const fresh = await getITAnalyticsDashboard(viewer.context, input, NOW);
-        expect(fresh.summary).toMatchObject({ resolvedTickets: 1, currentBacklog: 0, averageResolutionMinutes: 120 });
+        expect(fresh.summary).toMatchObject({ resolvedTickets: 1, currentBacklog: 0 });
         const all = await getITAnalyticsDashboard(viewer.context, { period: "7D" }, NOW);
-        expect(all.summary).toMatchObject({ resolvedTickets: 2, currentBacklog: 1, averageResolutionMinutes: 90 });
+        expect(all.summary).toMatchObject({ resolvedTickets: 2, currentBacklog: 1 });
     });
 
     it("allows analytics-only authority and denies defaults, ADMIN, ticket scopes, and inactive workforce", async () => {
@@ -1007,6 +972,14 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             .resolves.toMatchObject({
                 summary: { currentBacklog: 0, newTickets: 0 },
             });
+
+        const otherTicketId = await createTicket({
+            requester: defaults, type: "INCIDENT", status: "OPEN", createdAt: NOW,
+        });
+        await expect(listITOperatorTickets(analyticsOnly.context, {}))
+            .rejects.toBeInstanceOf(ITCapabilityDeniedError);
+        await expect(getITOperatorTicket(analyticsOnly.context, otherTicketId))
+            .rejects.toBeInstanceOf(ITCapabilityDeniedError);
     });
 
 });
