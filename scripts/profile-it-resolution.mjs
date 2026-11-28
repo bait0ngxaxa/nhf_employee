@@ -44,9 +44,7 @@ const reader = readerClient.$extends({
             const result = await query(args);
             if (sample) {
                 const end = performance.now();
-                const phase = model === "ITTicketEvent" && operation === "groupBy" ? "aggregation"
-                    : model === "ITTicket" && args.select?.id && args.select?.createdAt && args.select?.priority
-                        ? "hydration" : "other";
+                const phase = model === "ITTicketEvent" && operation === "groupBy" ? "aggregation" : "other";
                 sample[phase] += end - start;
                 sample.lastQueryAt = end;
                 sample.operations++;
@@ -78,7 +76,7 @@ reader.$transaction = async (callback, options) => {
 globalThis.prisma = reader;
 const connection = await mysql.createConnection({ uri: url.toString(), timezone: "Z" });
 
-async function inspectSql(event, includePlan = true, hint = "") {
+async function inspectSql(event, hint = "") {
     const params = JSON.parse(event.params).map((value) =>
         typeof value === "string" && /^\d{4}-\d\d-\d\d[T ]/.test(value) ? new Date(value) : value);
     const sql = event.query.replace(/^SELECT /, `SELECT ${hint}/* it-resolution diagnostic */ `);
@@ -94,7 +92,6 @@ async function inspectSql(event, includePlan = true, hint = "") {
         ORDER BY EVENT_ID DESC LIMIT 1`);
     assert.ok(work, "Missing MySQL statement instrumentation");
     assert.equal(work.rowsSent, rows.length);
-    if (!includePlan) return { work, rows };
     const [analyzed] = await connection.query("EXPLAIN ANALYZE " + sql, params);
     const [[json]] = await connection.query("EXPLAIN FORMAT=JSON " + sql, params);
     return { explain: analyzed[0].EXPLAIN, plan: JSON.parse(json.EXPLAIN).query_block, work, rows };
@@ -267,7 +264,7 @@ try {
                     const samples = [];
                     let captured;
                     for (let i = -WARMUPS; i < SAMPLES; i++) {
-                        const sample = { aggregation: 0, hydration: 0, other: 0, operations: 0 };
+                        const sample = { aggregation: 0, other: 0, operations: 0 };
                         sqlCapture = [];
                         const cpuStart = process.cpuUsage();
                         const start = performance.now();
@@ -289,17 +286,13 @@ try {
                         if (i >= 0) samples.push(sample);
                     }
                     const aggregation = captured.find((event) => event.query.includes("it_ticket_events") && event.query.includes("GROUP BY"));
-                    const hydration = captured.find((event) => event.query.includes("it_tickets`.`id` IN (") &&
-                        event.query.includes("it_tickets`.`priority`"));
                     assert.ok(aggregation);
                     const { rows: groups, ...plan } = await inspectSql(aggregation);
-                    const { rows: hydrated, ...hydrationPlan } = hydration ? await inspectSql(hydration, false) : { rows: [], work: null };
                     const expected = reference.get(scenario);
                     assert.equal(groups.length, expected.dashboard.summary.resolvedTickets);
-                    assert.equal(hydrated.length, groups.length);
                     let forcedEventFirst;
                     if (variant === "baseline" && ["combined-30D", "rare-30D"].includes(scenario)) {
-                        const { rows, ...forced } = await inspectSql(aggregation, true, "/*+ JOIN_PREFIX(it_ticket_events) */ ");
+                        const { rows, ...forced } = await inspectSql(aggregation, "/*+ JOIN_PREFIX(it_ticket_events) */ ");
                         const ordered = (rows) => [...rows].sort((a, b) => a.ticketId - b.ticketId);
                         assert.deepEqual(ordered(rows), ordered(groups));
                         forcedEventFirst = forced;
@@ -308,7 +301,7 @@ try {
                         size, variant, scenario, input, now, hash: expected.hash, resolvedTickets: groups.length,
                         metrics: Object.fromEntries(Object.keys(samples[0]).filter((key) => key !== "lastQueryAt")
                             .map((key) => [key, stats(samples.map((sample) => sample[key]))])),
-                        aggregation: plan, hydration: hydrationPlan, forcedEventFirst,
+                        aggregation: plan, forcedEventFirst,
                     });
                 }
                 const writes = await benchmarkWrites(fixture, context, getITAnalyticsDashboard, createITTicketEvent, updateITTicketIfVersionMatches);

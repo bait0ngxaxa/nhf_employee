@@ -181,40 +181,6 @@ function parseBacklogAging(value: unknown): ITAnalyticsDashboardDTO["backlogAgin
     return rows;
 }
 
-function parseResponseResolutionByPriority(
-    value: unknown,
-): ITAnalyticsDashboardDTO["responseResolutionByPriority"] | null {
-    if (!Array.isArray(value)) return null;
-    const rows: ITAnalyticsDashboardDTO["responseResolutionByPriority"][number][] = [];
-    for (const item of value) {
-        if (!isRecord(item)
-            || !hasExactKeys(item, [
-                "priority",
-                "firstRespondedTickets",
-                "averageFirstResponseMinutes",
-                "resolvedTickets",
-                "averageResolutionMinutes",
-            ])
-            || !isPriority(item.priority)
-            || !isNonNegativeInteger(item.firstRespondedTickets)
-            || !isNonNegativeInteger(item.resolvedTickets)
-            || (item.averageFirstResponseMinutes !== null
-                && !isNonNegativeNumber(item.averageFirstResponseMinutes))
-            || (item.averageResolutionMinutes !== null
-                && !isNonNegativeNumber(item.averageResolutionMinutes))) {
-            return null;
-        }
-        rows.push({
-            priority: item.priority,
-            firstRespondedTickets: item.firstRespondedTickets,
-            averageFirstResponseMinutes: item.averageFirstResponseMinutes,
-            resolvedTickets: item.resolvedTickets,
-            averageResolutionMinutes: item.averageResolutionMinutes,
-        });
-    }
-    return rows;
-}
-
 export function parseITAnalyticsDashboardResponse(
     value: unknown,
 ): ITAnalyticsDashboardDTO | null {
@@ -237,7 +203,6 @@ export function parseITAnalyticsDashboardResponse(
         "typeDistribution",
         "priorityDistribution",
         "priorityBacklog",
-        "responseResolutionByPriority",
         "topCategories",
         "backlogAging",
         "categoryBacklog",
@@ -262,9 +227,6 @@ export function parseITAnalyticsDashboardResponse(
             "oldestUnresolvedAgeMinutes",
             "newTickets",
             "resolvedTickets",
-            "firstRespondedTickets",
-            "averageFirstResponseMinutes",
-            "averageResolutionMinutes",
         ])) {
         return null;
     }
@@ -279,17 +241,10 @@ export function parseITAnalyticsDashboardResponse(
         "agedBacklog",
         "newTickets",
         "resolvedTickets",
-        "firstRespondedTickets",
     ] as const;
     if (countKeys.some((key) => !isNonNegativeInteger(summary[key]))) return null;
-    for (const key of [
-        "oldestUnresolvedAgeMinutes",
-        "averageFirstResponseMinutes",
-        "averageResolutionMinutes",
-    ] as const) {
-        const metric = summary[key];
-        if (metric !== null && !isNonNegativeNumber(metric)) return null;
-    }
+    const oldestUnresolvedAgeMinutes = summary.oldestUnresolvedAgeMinutes;
+    if (oldestUnresolvedAgeMinutes !== null && !isNonNegativeNumber(oldestUnresolvedAgeMinutes)) return null;
 
     if (!Array.isArray(dashboard.trend)) return null;
     const trend: ITAnalyticsDashboardDTO["trend"][number][] = [];
@@ -329,16 +284,12 @@ export function parseITAnalyticsDashboardResponse(
     const departmentCreated = parseLabelCounts(dashboard.departmentCreated);
     const priorityDistribution = parsePriorityCounts(dashboard.priorityDistribution);
     const priorityBacklog = parsePriorityCounts(dashboard.priorityBacklog);
-    const responseResolutionByPriority = parseResponseResolutionByPriority(
-        dashboard.responseResolutionByPriority,
-    );
     const filters = parseFilters(dashboard.filters);
     const filterOptions = parseFilterOptions(dashboard.filterOptions);
     const topCategories = parseTopCategories(dashboard.topCategories);
     const backlogAging = parseBacklogAging(dashboard.backlogAging);
     if (categoryBacklog === null || assigneeBacklog === null || departmentCreated === null
-        || priorityDistribution === null || priorityBacklog === null
-        || responseResolutionByPriority === null || filters === null
+        || priorityDistribution === null || priorityBacklog === null || filters === null
         || filterOptions === null || topCategories === null || backlogAging === null) {
         return null;
     }
@@ -360,19 +311,15 @@ export function parseITAnalyticsDashboardResponse(
             untriagedBacklog: summary.untriagedBacklog as number,
             highPriorityBacklog: summary.highPriorityBacklog as number,
             agedBacklog: summary.agedBacklog as number,
-            oldestUnresolvedAgeMinutes: summary.oldestUnresolvedAgeMinutes as number | null,
+            oldestUnresolvedAgeMinutes,
             newTickets: summary.newTickets as number,
             resolvedTickets: summary.resolvedTickets as number,
-            firstRespondedTickets: summary.firstRespondedTickets as number,
-            averageFirstResponseMinutes: summary.averageFirstResponseMinutes as number | null,
-            averageResolutionMinutes: summary.averageResolutionMinutes as number | null,
         },
         trend,
         statusDistribution,
         typeDistribution,
         priorityDistribution,
         priorityBacklog,
-        responseResolutionByPriority,
         topCategories,
         backlogAging,
         categoryBacklog,

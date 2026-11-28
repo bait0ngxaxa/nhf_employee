@@ -85,18 +85,6 @@ const populatedSnapshot: ITAnalyticsPersistenceSnapshot = {
         { departmentNameSnapshot: null, count: 1 },
     ],
     newTicketCount: 2,
-    firstResponses: [
-        {
-            priority: "P0",
-            createdAt: new Date("2026-09-25T15:00:00.000Z"),
-            firstRespondedAt: new Date("2026-09-25T15:45:00.000Z"),
-        },
-        {
-            priority: "P1",
-            createdAt: new Date("2026-09-25T16:00:00.000Z"),
-            firstRespondedAt: new Date("2026-09-25T16:20:00.000Z"),
-        },
-    ],
     createdAtValues: [
         new Date("2026-09-25T16:59:59.000Z"),
         new Date("2026-09-25T17:00:00.000Z"),
@@ -104,10 +92,6 @@ const populatedSnapshot: ITAnalyticsPersistenceSnapshot = {
     resolvedEvents: [
         { ticketId: 91, occurredAt: new Date("2026-09-25T16:59:59.000Z") },
         { ticketId: 92, occurredAt: new Date("2026-09-25T17:00:00.000Z") },
-    ],
-    resolvedTickets: [
-        { id: 91, createdAt: new Date("2026-09-25T15:59:59.000Z"), priority: "P1" },
-        { id: 92, createdAt: new Date("2026-09-25T15:30:00.000Z"), priority: "P3" },
     ],
     createdCategories: [
         { categoryId: 19, count: 1 },
@@ -180,9 +164,6 @@ describe("IT analytics application query", () => {
                 oldestUnresolvedAgeMinutes: 8225,
                 newTickets: 2,
                 resolvedTickets: 2,
-                firstRespondedTickets: 2,
-                averageFirstResponseMinutes: 32.5,
-                averageResolutionMinutes: 75,
             },
             typeDistribution: [
                 { type: "INCIDENT", count: 1 },
@@ -201,36 +182,6 @@ describe("IT analytics application query", () => {
                 { priority: "P2", count: 1 },
                 { priority: "P3", count: 0 },
             ],
-            responseResolutionByPriority: [
-                {
-                    priority: "P0",
-                    firstRespondedTickets: 1,
-                    averageFirstResponseMinutes: 45,
-                    resolvedTickets: 0,
-                    averageResolutionMinutes: null,
-                },
-                {
-                    priority: "P1",
-                    firstRespondedTickets: 1,
-                    averageFirstResponseMinutes: 20,
-                    resolvedTickets: 1,
-                    averageResolutionMinutes: 60,
-                },
-                {
-                    priority: "P2",
-                    firstRespondedTickets: 0,
-                    averageFirstResponseMinutes: null,
-                    resolvedTickets: 0,
-                    averageResolutionMinutes: null,
-                },
-                {
-                    priority: "P3",
-                    firstRespondedTickets: 0,
-                    averageFirstResponseMinutes: null,
-                    resolvedTickets: 1,
-                    averageResolutionMinutes: 90,
-                },
-            ],
             categoryBacklog: [
                 { label: "หมวดประวัติที่ปิดแล้ว", count: 2 },
                 { label: "ยังไม่จัดหมวดหมู่", count: 1 },
@@ -245,6 +196,10 @@ describe("IT analytics application query", () => {
                 { label: "ไม่ระบุหน่วยงาน", count: 1 },
             ],
         });
+        expect(result).not.toHaveProperty("responseResolutionByPriority");
+        expect(result.summary).not.toHaveProperty("firstRespondedTickets");
+        expect(result.summary).not.toHaveProperty("averageFirstResponseMinutes");
+        expect(result.summary).not.toHaveProperty("averageResolutionMinutes");
         expect(result.statusDistribution).toEqual([
             { status: "OPEN", count: 2 },
             { status: "IN_PROGRESS", count: 0 },
@@ -424,7 +379,7 @@ describe("IT analytics application query", () => {
         expect(mocks.authorize).toHaveBeenLastCalledWith(actor, "it.analytics.read", tx);
     });
 
-    it("returns complete zero data without inventing zero-duration samples", async () => {
+    it("returns complete zero data and no oldest unresolved age", async () => {
         useSnapshot({
             statuses: [],
             types: [],
@@ -436,10 +391,8 @@ describe("IT analytics application query", () => {
             untriagedBacklogCount: 0,
             departmentSnapshots: [],
             newTicketCount: 0,
-            firstResponses: [],
             createdAtValues: [],
             resolvedEvents: [],
-            resolvedTickets: [],
             createdCategories: [],
             backlogAges: [],
             categories: [],
@@ -457,9 +410,6 @@ describe("IT analytics application query", () => {
             oldestUnresolvedAgeMinutes: null,
             newTickets: 0,
             resolvedTickets: 0,
-            firstRespondedTickets: 0,
-            averageFirstResponseMinutes: null,
-            averageResolutionMinutes: null,
         });
         expect(result.trend).toHaveLength(7);
         expect(result.trend.every((day) => day.created === 0 && day.resolved === 0)).toBe(true);
@@ -477,7 +427,6 @@ describe("IT analytics application query", () => {
             { priority: "P2", count: 0 },
             { priority: "P3", count: 0 },
         ]);
-        expect(result.responseResolutionByPriority).toHaveLength(4);
         expect(result.categoryBacklog).toEqual([]);
         expect(result.assigneeBacklog).toEqual([]);
         expect(result.departmentCreated).toEqual([]);

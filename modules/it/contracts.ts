@@ -143,9 +143,6 @@ export interface ITAnalyticsDashboard {
         readonly oldestUnresolvedAgeMinutes: number | null;
         readonly newTickets: number;
         readonly resolvedTickets: number;
-        readonly firstRespondedTickets: number;
-        readonly averageFirstResponseMinutes: number | null;
-        readonly averageResolutionMinutes: number | null;
     };
     readonly trend: readonly {
         readonly date: string;
@@ -167,13 +164,6 @@ export interface ITAnalyticsDashboard {
     readonly priorityBacklog: readonly {
         readonly priority: ITTicketPriority;
         readonly count: number;
-    }[];
-    readonly responseResolutionByPriority: readonly {
-        readonly priority: ITTicketPriority;
-        readonly firstRespondedTickets: number;
-        readonly averageFirstResponseMinutes: number | null;
-        readonly resolvedTickets: number;
-        readonly averageResolutionMinutes: number | null;
     }[];
     /**
      * Period-created Tickets grouped by their *current* category identity.

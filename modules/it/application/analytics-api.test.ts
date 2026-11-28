@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 import type * as ITModule from "@/modules/it";
 
+import { IT_ANALYTICS_BACKLOG_AGE_BUCKETS, type ITAnalyticsDashboard } from "../contracts";
+import { parseITAnalyticsDashboardResponse } from "../presentation/dashboard/analytics-presentation";
+
 const mocks = vi.hoisted(() => ({
     requireApiSession: vi.fn(),
     buildContext: vi.fn(),
@@ -26,6 +29,7 @@ import { GET } from "@/app/api/it/analytics/route";
 import {
     ITAnalyticsInputValidationError,
     ITCapabilityDeniedError,
+    ITWorkforceDeniedError,
 } from "@/modules/it";
 
 const user = { id: 41, role: "USER", email: "staff@example.test", name: "Staff" };
@@ -37,7 +41,7 @@ const actorContext = {
         channel: "DASHBOARD",
     },
 };
-const dashboard = {
+const dashboard: ITAnalyticsDashboard = {
     generatedAt: "2026-09-25T17:05:00.000Z",
     timeZone: "Asia/Bangkok",
     period: {
@@ -45,24 +49,26 @@ const dashboard = {
         startAt: "2026-08-27T17:00:00.000Z",
         endAt: "2026-09-25T17:05:00.000Z",
     },
+    filters: { type: null, category: null },
+    filterOptions: { categories: [] },
     summary: {
         currentBacklog: 2,
         waitingRequester: 0,
         unassignedBacklog: 1,
         untriagedBacklog: 1,
+        highPriorityBacklog: 0,
+        agedBacklog: 0,
         oldestUnresolvedAgeMinutes: 45,
         newTickets: 1,
         resolvedTickets: 0,
-        firstRespondedTickets: 0,
-        averageFirstResponseMinutes: null,
-        averageResolutionMinutes: null,
     },
     trend: [],
     statusDistribution: [],
     typeDistribution: [],
     priorityDistribution: [],
     priorityBacklog: [],
-    responseResolutionByPriority: [],
+    topCategories: { limit: 10, rows: [], otherCategoryCount: 0, otherTicketCount: 0 },
+    backlogAging: IT_ANALYTICS_BACKLOG_AGE_BUCKETS.map(({ key }) => ({ bucket: key, count: 0 })),
     categoryBacklog: [],
     assigneeBacklog: [],
     departmentCreated: [],
@@ -181,6 +187,8 @@ describe("IT analytics API adapter", () => {
         const serialized = JSON.stringify(body);
 
         expect(response.status).toBe(200);
+        expect(body).toEqual({ success: true, dashboard });
+        expect(parseITAnalyticsDashboardResponse(body)).toEqual(dashboard);
         expect(mocks.buildContext).toHaveBeenCalledWith(user);
         expect(mocks.getDashboard).toHaveBeenCalledWith(actorContext, { period: "30D" });
         for (const forbidden of [
@@ -196,11 +204,11 @@ describe("IT analytics API adapter", () => {
         }
     });
 
-    it("returns the existing safe 403 for missing analytics authority", async () => {
-        mocks.getDashboard.mockRejectedValue(new ITCapabilityDeniedError(
-            "it.analytics.read",
-            "NO_APPLICABLE_GRANT",
-        ));
+    it.each([
+        ["missing analytics authority", new ITCapabilityDeniedError("it.analytics.read", "NO_APPLICABLE_GRANT")],
+        ["inactive workforce", new ITWorkforceDeniedError()],
+    ])("returns the existing safe 403 for %s", async (_label, error) => {
+        mocks.getDashboard.mockRejectedValue(error);
 
         const response = await GET(request());
 

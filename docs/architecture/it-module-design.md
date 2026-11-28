@@ -189,15 +189,12 @@ Reporting uses the explicit `Asia/Bangkok` timezone and supports exactly `7D`, `
 | Current backlog | Current status is `OPEN`, `IN_PROGRESS`, or `WAITING_REQUESTER`; `RESOLVED`, `CLOSED`, and `CANCELLED` are excluded. Summary includes waiting requester, unassigned backlog, and whole-minute age of the oldest current-backlog Ticket, without identifying that Ticket. |
 | New Tickets | Tickets with `createdAt` in `[startAt, endAt)`. |
 | Resolved Tickets | Distinct Ticket IDs with `ITTicketEvent.kind = STATUS_CHANGED` and `toStatus = RESOLVED` in the period. Reopening and resolving again does not count a Ticket more than once in the same reporting window; cancellation alone is never resolution. |
-| Average first response | Period-created Ticket cohort with non-null canonical `firstRespondedAt`; duration is `firstRespondedAt - createdAt`, elapsed wall-clock minutes. The DTO also reports sample count. |
-| Average resolution | Tickets with a period `STATUS_CHANGED → RESOLVED` event; duration is the earliest qualifying event for each Ticket in the period's `occurredAt - Ticket.createdAt`. `updatedAt` and cancellation events are not used. |
-| Created vs resolved trend | One local-day bucket per period date, from `Ticket.createdAt` and `STATUS_CHANGED → RESOLVED` event `occurredAt`. Cancellation events do not contribute to resolved totals. Empty days have zero values. |
+| Created vs resolved trend | One local-day bucket per period date, from `Ticket.createdAt` and the earliest qualifying `STATUS_CHANGED → RESOLVED` event `occurredAt` per Ticket in the period. Cancellation events do not contribute to resolved totals. Empty days have zero values. |
 | Current status distribution | All current Tickets grouped by current status, in canonical enum/label order with zero counts included. |
 | Ticket type distribution | Period-created Ticket cohort grouped as `INCIDENT`, `SERVICE_REQUEST`, and `SUGGESTION`, with stable zero-count values. |
 | Ticket priority distribution | All current Tickets grouped by current priority, including terminal history, with `P0`–`P3` zero-count values. Reclassification changes this current grouping. |
 | Active backlog by priority | Current `OPEN`, `IN_PROGRESS`, and `WAITING_REQUESTER` Tickets grouped by current priority; `RESOLVED`, `CLOSED`, and `CANCELLED` are excluded. |
 | Untriaged backlog | Current active-backlog Tickets with `triagedAt = NULL`; resolved and terminal Tickets are excluded. |
-| Response and resolution by priority | Period-created first-response samples and period-resolved samples grouped by each Ticket's current priority. Reclassification can change historical group membership; these are not priority-at-creation measurements. |
 | Current backlog by category | Current backlog grouped by current category. Null uses `ยังไม่จัดหมวดหมู่`; inactive referenced categories remain reportable. |
 | Current workload by assignee | Current backlog grouped by current assignee. Null uses `ยังไม่มีผู้รับผิดชอบ`; unresolved historical identities use a safe fallback and retain their count. |
 | Requests by requester Department | Period-created Ticket cohort grouped by immutable `requesterDepartmentNameSnapshot`. Null/blank uses `ไม่ระบุหน่วยงาน`; current Employee Department is never joined for history. |
@@ -207,11 +204,11 @@ Reporting uses the explicit `Asia/Bangkok` timezone and supports exactly `7D`, `
 | Aged backlog | Current backlog aged at least `IT_ANALYTICS_AGED_BACKLOG_MIN_DAYS` (8) completed days, i.e. "older than seven completed days"; equals the `8_14` + `15_PLUS` buckets. |
 | Category filter options | Active categories plus inactive categories still referenced by at least one Ticket. Reference data only; never filtered by the selected scope. |
 
-The browser-safe DTO contains only period metadata, aggregate counts/durations, daily totals, current-priority distributions, and approved category/assignee/Department labels. It contains no Ticket identifiers, titles, descriptions, comment text, attachment metadata, requester identity, or raw event rows. The internal API is `GET /api/it/analytics?period=30D`; it accepts only `7D`, `30D`, or `90D`, defaults a missing parameter to `30D`, and rejects malformed, duplicate, or extra parameters safely.
+The browser-safe DTO contains only period metadata, aggregate counts, oldest backlog age, daily totals, current-priority distributions, and approved category/assignee/Department labels. It contains no Ticket identifiers, titles, descriptions, comment text, attachment metadata, requester identity, or raw event rows. The internal API is `GET /api/it/analytics?period=30D`; it accepts only `7D`, `30D`, or `90D`, defaults a missing parameter to `30D`, and rejects malformed, duplicate, or extra parameters safely.
 
 **Ticket filters (analytics dashboard enhancement).** The API additionally accepts optional `type` (`INCIDENT`, `SERVICE_REQUEST`, `SUGGESTION`) and `category` (a positive category ID or `uncategorized`), each at most once. Both filters narrow the Ticket population for **every** metric — period metrics and current-snapshot metrics alike, including resolution events through their Ticket's current type/category. The period narrows only period metrics; it never restricts current backlog, priority, aging, assignee or attention counts. The response echoes the applied `filters` and returns `filterOptions.categories`. Category filtering uses current category, so a reclassified Ticket follows its new category in both period and snapshot metrics.
 
-All persistence aggregates are read in one MySQL `REPEATABLE READ` transaction. InnoDB's consistent non-locking reads in this isolation share one transaction snapshot, so summary cards and distributions represent the same database moment. This is a read-only snapshot, not the Serializable mutation helper. Queries use database counts/grouping/minimums and only bounded timestamp projections for daily bucketing and average calculations. The requester Department name is stored at Ticket creation by the existing Employee public snapshot contract; IT never reads Employee persistence internals.
+All persistence aggregates are read in one MySQL `REPEATABLE READ` transaction. InnoDB's consistent non-locking reads in this isolation share one transaction snapshot, so summary cards and distributions represent the same database moment. This is a read-only snapshot, not the Serializable mutation helper. Queries use database counts/grouping/minimums and only bounded timestamp projections for daily bucketing. Resolution grouping supplies both the distinct count and the earliest in-window timestamps. Retiring duration analytics removed the first-response sample query and the Ticket-detail lookup for resolution duration. The requester Department name is stored at Ticket creation by the existing Employee public snapshot contract; IT never reads Employee persistence internals.
 
 Deferred beyond IT7: reopen counts and accumulated resolution cycles, accumulated `WAITING_REQUESTER` duration, business-hours duration, SLA/compliance, historical assignment/category intervals, status-as-of reporting, custom date ranges, exports, materialized analytics, scheduled aggregation, external BI, forecasting, AI insights, and Email Request analytics. These need an approved reporting policy or IT8 ownership first. Formal SLA policies, deadlines, countdowns, breach calculations, and compliance percentages remain out of scope.
 
@@ -937,11 +934,10 @@ materialized view, or new authorization capability was added.
 
 **Layout (desktop reading order).** Report filters → four KPI cards
 (`งานค้างปัจจุบัน`, `Ticket ใหม่`, `แก้ไขแล้ว`, `งานเร่งด่วน P0 / P1`) with
-compact first-response, resolution, unassigned and untriaged metrics →
+compact unassigned and untriaged metrics →
 `หมวดปัญหาที่มีการแจ้งมากที่สุด` (primary ranked horizontal bar chart plus ranked
 list) → `งานค้างตาม Priority` donut beside `อายุงานค้าง` → `สิ่งที่ต้องติดตาม`
-beside `งานค้างตามผู้รับผิดชอบ` → `ประสิทธิภาพการให้บริการ` (by current priority)
-→ the existing created/resolved trend, retitled
+beside `งานค้างตามผู้รับผิดชอบ` → the existing created/resolved trend, retitled
 `แนวโน้ม Ticket ใหม่และแก้ไขแล้ว` and otherwise unchanged → a remaining
 breakdown selector (status, type, all-status priority, backlog category,
 Department). Every panel carries a text badge, `ตามช่วงรายงาน` or
