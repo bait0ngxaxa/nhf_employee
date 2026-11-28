@@ -49,6 +49,12 @@ const dashboard: ITAnalyticsDashboard = {
         startAt: "2026-08-27T17:00:00.000Z",
         endAt: "2026-09-25T17:05:00.000Z",
     },
+    previousPeriod: {
+        startAt: "2026-07-29T16:55:00.000Z",
+        endAt: "2026-08-27T17:00:00.000Z",
+        newTickets: { count: 2, percentageChange: -50 },
+        resolvedTickets: { count: 0, percentageChange: 0 },
+    },
     filters: { type: null, category: null },
     filterOptions: { categories: [] },
     summary: {
@@ -61,6 +67,9 @@ const dashboard: ITAnalyticsDashboard = {
         oldestUnresolvedAgeMinutes: 45,
         newTickets: 1,
         resolvedTickets: 0,
+        closedTickets: 0,
+        cancelledTickets: 0,
+        reopenedTickets: 0,
     },
     trend: [],
     statusDistribution: [],

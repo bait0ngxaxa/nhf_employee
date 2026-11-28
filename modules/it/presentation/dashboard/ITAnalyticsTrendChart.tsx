@@ -38,7 +38,7 @@ export function ITAnalyticsTrendChart({ trend, period }: {
             <figcaption className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-                        <h2 className="text-lg font-semibold text-content-heading">แนวโน้ม Ticket ใหม่และแก้ไขแล้ว</h2>
+                        <h3 className="text-lg font-semibold text-content-heading">แนวโน้ม Ticket ใหม่และแก้ไขแล้ว</h3>
                         <ITAnalyticsScopeBadge scope="period" />
                     </div>
                     <p className="mt-1 text-sm leading-6 text-content-secondary">
@@ -117,7 +117,7 @@ export function ITAnalyticsTrendChart({ trend, period }: {
                     เลื่อนกราฟไปด้านข้างเพื่อดูข้อมูล แตะกราฟหรือใช้ปุ่มลูกศรเพื่อดูตัวเลข
                 </p>
                 <section aria-label="ตัวเลขช่วงที่เลือก" className="mt-3 rounded-lg bg-surface-subtle px-3 py-2">
-                    <h3 className="text-sm font-medium text-content-heading">ตัวเลขช่วงที่เลือก</h3>
+                    <h4 className="text-sm font-medium text-content-heading">ตัวเลขช่วงที่เลือก</h4>
                     <p className="text-xs leading-5 text-content-secondary">ชี้หรือแตะแท่งกราฟ หรือใช้ปุ่มลูกศรเพื่อเลือกช่วง</p>
                     {/* The portal uses normal document flow, outside the scrollable plot. */}
                     <div ref={setTooltipPortal} aria-live="polite" aria-atomic="true" className="min-h-20" />

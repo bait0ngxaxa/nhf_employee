@@ -31,6 +31,8 @@ export interface ITAnalyticsBacklogAgeRange {
 export interface ITAnalyticsQueryWindow {
     readonly startAt: Date;
     readonly endAt: Date;
+    /** The comparison ends at startAt. */
+    readonly previousStartAt: Date;
     readonly backlogStatuses: readonly ITTicketStatus[];
     readonly resolutionEventKind: ITTicketEventKind;
     readonly resolutionStatus: ITTicketStatus;
@@ -93,6 +95,11 @@ export interface ITAnalyticsPersistenceSnapshot {
     readonly backlogOldestCreatedAt: Date | null;
     readonly departmentSnapshots: readonly ITAnalyticsDepartmentCount[];
     readonly newTicketCount: number;
+    readonly previousNewTicketCount: number;
+    readonly previousResolvedTicketCount: number;
+    readonly closedTicketCount: number;
+    readonly cancelledTicketCount: number;
+    readonly reopenedTicketCount: number;
     readonly createdAtValues: readonly Date[];
     readonly resolvedEvents: readonly ITAnalyticsResolvedEvent[];
     /** Period-created Tickets grouped by current category identity. */
@@ -107,8 +114,10 @@ function countOf(group: { readonly _count: { readonly _all: number } }): number 
 }
 
 /** Empty scope yields `{}` so unfiltered predicates stay unchanged. */
-function toTicketScopeWhere(scope: ITAnalyticsTicketScope | undefined): Prisma.ITTicketWhereInput {
-    const where: Prisma.ITTicketWhereInput = {};
+function toTicketScopeWhere(
+    scope: ITAnalyticsTicketScope | undefined,
+): { type?: ITTicketType; categoryId?: number | null } {
+    const where: { type?: ITTicketType; categoryId?: number | null } = {};
     if (scope?.type) where.type = scope.type;
     if (scope?.category !== undefined && scope.category !== null) {
         where.categoryId = scope.category === "uncategorized" ? null : scope.category;
@@ -129,7 +138,16 @@ export async function readITAnalyticsPersistenceSnapshot(
     window: ITAnalyticsQueryWindow,
 ): Promise<ITAnalyticsPersistenceSnapshot> {
     const scopeWhere = toTicketScopeWhere(window.scope);
-    const hasScope = Object.keys(scopeWhere).length > 0;
+    const ticketScopePredicates: Prisma.Sql[] = [];
+    if (scopeWhere.type !== undefined) {
+        ticketScopePredicates.push(Prisma.sql`it_tickets.type = ${scopeWhere.type}`);
+    }
+    if (scopeWhere.categoryId !== undefined) {
+        ticketScopePredicates.push(scopeWhere.categoryId === null
+            ? Prisma.sql`it_tickets.categoryId IS NULL`
+            : Prisma.sql`it_tickets.categoryId = ${scopeWhere.categoryId}`);
+    }
+    const hasScope = ticketScopePredicates.length > 0;
     const backlogStatusFilter = [...window.backlogStatuses];
     const backlogWhere: Prisma.ITTicketWhereInput = {
         ...scopeWhere,
@@ -183,6 +201,9 @@ export async function readITAnalyticsPersistenceSnapshot(
         _count: { _all: true },
     });
     const newTicketCount = await tx.iTTicket.count({ where: periodWhere });
+    const previousNewTicketCount = await tx.iTTicket.count({
+        where: { ...scopeWhere, createdAt: { gte: window.previousStartAt, lt: window.startAt } },
+    });
     const createdRows = await tx.iTTicket.findMany({
         where: periodWhere,
         select: { createdAt: true },
@@ -198,6 +219,33 @@ export async function readITAnalyticsPersistenceSnapshot(
         },
         _min: { occurredAt: true },
     });
+    // Keep the existing current-resolution trend query. Fetch only scalar
+    // counts for the comparison and the other transitions in one statement.
+    const [eventCounts] = await tx.$queryRaw<readonly [{
+        readonly previousResolvedTickets: bigint;
+        readonly closedTickets: bigint;
+        readonly cancelledTickets: bigint;
+        readonly reopenedTickets: bigint;
+    }]>(Prisma.sql`
+        SELECT
+            COUNT(DISTINCT CASE WHEN e.occurredAt < ${window.startAt}
+                THEN e.ticketId END) AS previousResolvedTickets,
+            COUNT(DISTINCT CASE WHEN e.toStatus = 'CLOSED' THEN e.ticketId END) AS closedTickets,
+            COUNT(DISTINCT CASE WHEN e.toStatus = 'CANCELLED' THEN e.ticketId END) AS cancelledTickets,
+            COUNT(DISTINCT CASE WHEN e.toStatus = 'IN_PROGRESS' THEN e.ticketId END) AS reopenedTickets
+        FROM it_ticket_events AS e
+        ${hasScope ? Prisma.sql`INNER JOIN it_tickets ON it_tickets.id = e.ticketId` : Prisma.empty}
+        WHERE e.kind = ${window.resolutionEventKind}
+          AND e.occurredAt >= ${window.previousStartAt} AND e.occurredAt < ${window.endAt}
+          AND (
+              (e.occurredAt < ${window.startAt} AND e.toStatus = ${window.resolutionStatus})
+              OR (e.occurredAt >= ${window.startAt} AND (
+                  e.toStatus IN ('CLOSED', 'CANCELLED')
+                  OR (e.fromStatus = ${window.resolutionStatus} AND e.toStatus = 'IN_PROGRESS')
+              ))
+          )
+          ${hasScope ? Prisma.sql`AND ${Prisma.join(ticketScopePredicates, " AND ")}` : Prisma.empty}
+    `);
     const createdCategoryGroups = await tx.iTTicket.groupBy({
         by: ["categoryId"],
         where: periodWhere,
@@ -209,12 +257,7 @@ export async function readITAnalyticsPersistenceSnapshot(
     const ageScope: Prisma.Sql[] = [backlogStatusFilter.length === 0
         ? Prisma.sql`FALSE`
         : Prisma.sql`status IN (${Prisma.join(backlogStatusFilter)})`];
-    if (window.scope?.type) ageScope.push(Prisma.sql`type = ${window.scope.type}`);
-    if (window.scope?.category !== undefined && window.scope.category !== null) {
-        ageScope.push(window.scope.category === "uncategorized"
-            ? Prisma.sql`categoryId IS NULL`
-            : Prisma.sql`categoryId = ${window.scope.category}`);
-    }
+    ageScope.push(...ticketScopePredicates);
     const ageRows = ranges.length === 0 ? [] : await tx.$queryRaw<{
         readonly bucket: ITAnalyticsBacklogAgeBucketKey;
         readonly count: bigint;
@@ -267,6 +310,11 @@ export async function readITAnalyticsPersistenceSnapshot(
             count: countOf(group),
         })),
         newTicketCount,
+        previousNewTicketCount,
+        previousResolvedTicketCount: Number(eventCounts.previousResolvedTickets),
+        closedTicketCount: Number(eventCounts.closedTickets),
+        cancelledTicketCount: Number(eventCounts.cancelledTickets),
+        reopenedTicketCount: Number(eventCounts.reopenedTickets),
         createdAtValues: createdRows.map((row) => row.createdAt),
         resolvedEvents: resolutionGroups.map((group) => ({
             ticketId: group.ticketId,

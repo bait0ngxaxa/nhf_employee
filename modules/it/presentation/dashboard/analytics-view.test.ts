@@ -4,6 +4,7 @@ import {
     buildITAnalyticsAgingRows,
     buildITAnalyticsPrioritySlices,
     buildITAnalyticsWorkloadRows,
+    formatITAnalyticsComparison,
     formatITAnalyticsShare,
     truncateITAnalyticsLabel,
 } from "./analytics-view";
@@ -13,6 +14,17 @@ describe("IT analytics view helpers", () => {
         expect(formatITAnalyticsShare(0, 0)).toBe("0%");
         expect(formatITAnalyticsShare(1, 3)).toBe("33.3%");
         expect(formatITAnalyticsShare(5, 5)).toBe("100%");
+    });
+
+    it.each([
+        [0, 0, 0, "เท่าเดิม · ช่วงก่อนหน้า 0 Ticket"],
+        [6, 0, null, "เพิ่มขึ้น 6 Ticket · ช่วงก่อนหน้า 0 Ticket"],
+        [0, 2, -100, "ลดลง 100% · ช่วงก่อนหน้า 2 Ticket"],
+        [3, 2, 50, "เพิ่มขึ้น 50% · ช่วงก่อนหน้า 2 Ticket"],
+        [2, 3, -33.33333333333333, "ลดลง 33.3% · ช่วงก่อนหน้า 3 Ticket"],
+        [2, 2, 0, "เท่าเดิม · ช่วงก่อนหน้า 2 Ticket"],
+    ])("describes a change from %s / %s (%s%%) in neutral language", (current, count, percentageChange, expected) => {
+        expect(formatITAnalyticsComparison(current, { count, percentageChange })).toBe(expected);
     });
 
     it("keeps every priority in canonical order with its share of the current backlog", () => {

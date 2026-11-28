@@ -279,13 +279,13 @@ export async function checkWorkspaceHeaders(browser, origin) {
                         if (name === "รายงาน") {
                             await page.getByRole("tab", { name, exact: true, selected: true }).waitFor();
                             const report = page.getByRole("tabpanel", { name, exact: true });
-                            const overview = report.getByRole("region", { name: "ภาพรวม", exact: true });
+                            const overview = report.getByRole("region", { name: "สถานะงานปัจจุบัน", exact: true });
                             const error = report.getByRole("alert");
                             await overview.or(error).waitFor();
                             assert.equal(await error.isVisible(), false,
                                 `IT Analytics must reach ready state: ${await error.allTextContents()}`);
                             assert.equal(await report.getByRole("status", { name: "กำลังโหลดรายงาน IT" }).isVisible(), false);
-                            await overview.getByText("งานค้างปัจจุบัน", { exact: true }).waitFor();
+                            await overview.getByText("งานค้างทั้งหมด", { exact: true }).waitFor();
                         }
                         await check("it-ticket", "บริการ IT", 64, true);
                         await capture(name === "รายงาน" ? "dashboard-it-analytics" : "dashboard-it-queue");

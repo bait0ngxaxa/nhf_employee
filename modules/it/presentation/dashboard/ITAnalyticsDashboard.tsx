@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowUpRight, BarChart3, CircleAlert, Clock3, RotateCcw, RotateCw, ShieldAlert, UserRoundX, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, CircleAlert, Clock3, RotateCcw, RotateCw, ShieldAlert, UserRoundX, type LucideIcon } from "lucide-react";
 import type { ITTicketPriority } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
     type ITAnalyticsCategoryFilter,
     type ITAnalyticsPeriod,
 } from "../../contracts";
+import { IT_TICKET_ACTIVE_WORK_STATUSES } from "../../domain/ticket-workflow";
 import {
     formatITAnalyticsDateTime,
     formatITAnalyticsDuration,
@@ -39,10 +40,10 @@ import {
     type ITAnalyticsQueueDestinations,
     type ITAnalyticsReportState,
 } from "./analytics-url-state";
-import { formatITAnalyticsCount } from "./analytics-view";
+import { formatITAnalyticsComparison, formatITAnalyticsCount } from "./analytics-view";
 import {
     ITAnalyticsBacklogAgingPanel,
-    ITAnalyticsEmptyState,
+    ITAnalyticsCountBars,
     ITAnalyticsPanel,
     ITAnalyticsPriorityBacklogPanel,
     ITAnalyticsScopeBadge,
@@ -50,7 +51,6 @@ import {
     ITAnalyticsWorkloadPanel,
     type ITAnalyticsScope,
 } from "./ITAnalyticsCharts";
-import { IT_TICKET_PRIORITY_STYLES } from "./ticket-presentation";
 import { ITAnalyticsTrendChart } from "./ITAnalyticsTrendChart";
 
 type RequestState =
@@ -73,10 +73,8 @@ const PERIOD_LABELS: Readonly<Record<ITAnalyticsPeriod, string>> = {
 
 const BREAKDOWN_OPTIONS = [
     { value: "status", label: "สถานะ" },
-    { value: "type", label: "ประเภท" },
     { value: "priority", label: "Priority" },
     { value: "category", label: "หมวดหมู่งานค้าง" },
-    { value: "department", label: "หน่วยงาน" },
 ] as const;
 
 type BreakdownDimension = typeof BREAKDOWN_OPTIONS[number]["value"];
@@ -87,8 +85,9 @@ function ReportSkeleton(): ReactElement {
     return (
         <div role="status" aria-label="กำลังโหลดรายงาน IT" className="space-y-5">
             <span className="sr-only">กำลังโหลดรายงาน IT</span>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {Array.from({ length: 4 }, (_, index) => (
+            <Skeleton className="h-7 w-52" />
+            <div className="grid grid-cols-2 gap-3">
+                {Array.from({ length: 2 }, (_, index) => (
                     <Skeleton key={index} className="h-32 w-full rounded-xl" />
                 ))}
             </div>
@@ -104,109 +103,64 @@ function ReportSkeleton(): ReactElement {
 
 function KpiCard({
     label,
-    value,
+    count,
     detail,
-    scope,
-    marker,
 }: {
     readonly label: string;
-    readonly value: string;
-    readonly detail: ReactNode;
-    readonly scope: ITAnalyticsScope;
-    readonly marker?: ReactNode;
+    readonly count: number;
+    readonly detail?: ReactNode;
 }): ReactElement {
     return (
-        <div className="flex min-w-0 flex-col rounded-xl border border-border-neutral bg-surface-raised p-4 sm:p-5">
-            <dt className="flex min-w-0 flex-wrap items-center gap-2 text-sm font-medium leading-6 text-content-secondary">
-                <span className="min-w-0 break-words">{label}</span>
-                {marker ?? null}
-            </dt>
-            <dd className="mt-2 text-3xl font-bold tracking-tight tabular-nums text-content-heading sm:text-4xl">
-                {value}
+        <div className="min-w-0 rounded-xl border border-border-neutral bg-surface-raised p-3 sm:p-5">
+            <dt className="text-sm font-medium leading-6 text-content-secondary [overflow-wrap:anywhere]">{label}</dt>
+            <dd className="mt-1 text-2xl font-semibold tracking-tight tabular-nums text-content-heading [overflow-wrap:anywhere] sm:text-3xl">
+                {formatITAnalyticsCount(count)}
             </dd>
-            <dd className="mt-2 flex min-w-0 flex-1 flex-col justify-end gap-2 text-xs leading-5 text-content-secondary">
-                <span className="break-words">{detail}</span>
-                <span><ITAnalyticsScopeBadge scope={scope} /></span>
-            </dd>
+            {detail ? <dd className="mt-1.5 text-xs leading-5 text-content-secondary">{detail}</dd> : null}
         </div>
     );
 }
 
-function PriorityMarker({ priority }: { readonly priority: ITTicketPriority }): ReactElement {
+function PeriodOverview({ dashboard }: { readonly dashboard: ITAnalyticsDashboardDTO }): ReactElement {
+    const { summary, previousPeriod } = dashboard;
     return (
-        <span className={`inline-flex min-h-6 items-center rounded-full px-2 text-xs font-semibold ${IT_TICKET_PRIORITY_STYLES[priority]}`}>
-            {priority}
-        </span>
-    );
-}
-
-function KpiSummary({ dashboard }: { readonly dashboard: ITAnalyticsDashboardDTO }): ReactElement {
-    const { summary } = dashboard;
-    const priorityCount = (priority: ITTicketPriority): number =>
-        dashboard.priorityBacklog.find((row) => row.priority === priority)?.count ?? 0;
-    return (
-        <section aria-labelledby="it-analytics-overview-title" className="min-w-0 space-y-3">
-            <h2 id="it-analytics-overview-title" className="sr-only">ภาพรวม</h2>
-            <dl className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4">
-                <KpiCard
-                    label="งานค้างปัจจุบัน"
-                    value={formatITAnalyticsCount(summary.currentBacklog)}
-                    scope="snapshot"
-                    detail={summary.oldestUnresolvedAgeMinutes === null
-                        ? "ไม่มีงานค้าง"
-                        : "งานที่ค้างนานที่สุด " + formatITAnalyticsDuration(summary.oldestUnresolvedAgeMinutes)}
-                />
+        <section aria-labelledby="it-analytics-period-title" aria-describedby="it-analytics-period-description" className="min-w-0 space-y-3">
+            <div className="space-y-1">
+                <h2 id="it-analytics-period-title" className="text-lg font-semibold text-content-heading">ผลการดำเนินงานตามช่วงเวลา</h2>
+                <p id="it-analytics-period-description" className="text-sm leading-6 text-content-secondary">
+                    เปรียบเทียบกับช่วงก่อนหน้าที่มีระยะเวลาเท่ากัน ({formatITAnalyticsDateTime(previousPeriod.startAt)} ถึง {formatITAnalyticsDateTime(previousPeriod.endAt)} น.)
+                </p>
+            </div>
+            <dl className="grid min-w-0 grid-cols-2 gap-3">
                 <KpiCard
                     label="Ticket ใหม่"
-                    value={formatITAnalyticsCount(summary.newTickets)}
-                    scope="period"
-                    detail={`สร้างในช่วง ${PERIOD_LABELS[dashboard.period.key]}ล่าสุด`}
+                    count={summary.newTickets}
+                    detail={formatITAnalyticsComparison(summary.newTickets, previousPeriod.newTickets)}
                 />
                 <KpiCard
                     label="แก้ไขแล้ว"
-                    value={formatITAnalyticsCount(summary.resolvedTickets)}
-                    scope="period"
-                    detail="นับ Ticket ละครั้ง แม้เปิดใหม่และแก้ไขซ้ำในช่วงเดียวกัน"
-                />
-                <KpiCard
-                    label="งานเร่งด่วน"
-                    marker={<><PriorityMarker priority="P0" /><PriorityMarker priority="P1" /></>}
-                    value={formatITAnalyticsCount(summary.highPriorityBacklog)}
-                    scope="snapshot"
-                    detail={`P0 ${formatITAnalyticsCount(priorityCount("P0"))} · P1 ${formatITAnalyticsCount(priorityCount("P1"))} ที่ยังไม่แก้ไข`}
+                    count={summary.resolvedTickets}
+                    detail={formatITAnalyticsComparison(summary.resolvedTickets, previousPeriod.resolvedTickets)}
                 />
             </dl>
-            <dl className="grid min-w-0 grid-cols-2 gap-x-5 gap-y-4 rounded-xl border border-border-neutral bg-surface-subtle px-4 py-4 sm:px-5">
-                <SecondaryMetric
-                    label="ยังไม่มีผู้รับผิดชอบ"
-                    value={formatITAnalyticsCount(summary.unassignedBacklog)}
-                    detail="ในงานค้างปัจจุบัน"
-                />
-                <SecondaryMetric
-                    label="ยังไม่ประเมิน Priority"
-                    value={formatITAnalyticsCount(summary.untriagedBacklog)}
-                    detail="ในงานค้างปัจจุบัน"
-                />
-            </dl>
+            <div className="space-y-2 rounded-xl border border-border-neutral bg-surface-subtle px-3 py-3 sm:px-5">
+                <dl className="grid grid-cols-3 gap-3">
+                    {[
+                        { label: "ปิดงานแล้ว", count: summary.closedTickets },
+                        { label: "ยกเลิก", count: summary.cancelledTickets },
+                        { label: "เปิดกลับมาแก้ไข", count: summary.reopenedTickets },
+                    ].map(({ label, count }) => (
+                        <div key={label} className="min-w-0">
+                            <dt className="text-sm leading-5 text-content-secondary [overflow-wrap:anywhere]">{label}</dt>
+                            <dd className="text-lg font-semibold tabular-nums text-content-heading [overflow-wrap:anywhere]">{formatITAnalyticsCount(count)}</dd>
+                        </div>
+                    ))}
+                </dl>
+                <p className="text-xs leading-5 text-content-secondary">
+                    นับ Ticket หนึ่งครั้งต่อประเภทเหตุการณ์ในช่วงที่เลือก Ticket เดียวอาจอยู่หลายประเภทและมีสถานะล่าสุดต่างจากเหตุการณ์ที่นับ
+                </p>
+            </div>
         </section>
-    );
-}
-
-function SecondaryMetric({
-    label,
-    value,
-    detail,
-}: {
-    readonly label: string;
-    readonly value: string;
-    readonly detail: string;
-}): ReactElement {
-    return (
-        <div className="min-w-0">
-            <dt className="break-words text-xs font-medium leading-5 text-content-secondary">{label}</dt>
-            <dd className="mt-0.5 break-words text-lg font-semibold tabular-nums text-content-heading">{value}</dd>
-            <dd className="text-xs leading-5 text-content-muted">{detail}</dd>
-        </div>
     );
 }
 
@@ -279,14 +233,14 @@ function AttentionPanel({
         <ITAnalyticsPanel
             title="สิ่งที่ต้องติดตาม"
             scope="snapshot"
-            description="งานค้างที่ควรตรวจสอบก่อน คำนวณจากสถานะล่าสุดของ Ticket"
+            description="งานค้างที่ควรตรวจสอบก่อน Ticket เดียวอาจอยู่ได้หลายรายการติดตาม"
         >
-            <ul className="divide-y divide-border-neutral">
+            <ul className="divide-y divide-border-neutral lg:grid lg:grid-cols-2 lg:gap-x-6 lg:gap-y-5 lg:divide-y-0">
                 {items.map((item) => {
                     const Icon = item.icon;
                     const needsAttention = item.count > 0;
                     return (
-                        <li key={item.key} className="flex min-w-0 items-start gap-3 py-3 first:pt-0 last:pb-0">
+                        <li key={item.key} className="flex min-w-0 items-start gap-3 py-3 first:pt-0 last:pb-0 lg:py-0">
                             <span
                                 aria-hidden="true"
                                 className={"mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg "
@@ -341,15 +295,6 @@ function BreakdownPanel({ dashboard }: { readonly dashboard: ITAnalyticsDashboar
                 count: row.count,
             })),
         },
-        type: {
-            title: "Ticket ใหม่แยกตามประเภท",
-            description: "นับ Ticket ที่สร้างในช่วงรายงาน",
-            scope: "period",
-            rows: dashboard.typeDistribution.map((row) => ({
-                label: IT_TICKET_TYPE_LABELS[row.type],
-                count: row.count,
-            })),
-        },
         priority: {
             title: "Ticket ปัจจุบันแยกตาม Priority",
             description: "รวมทุกสถานะและจัดกลุ่มตาม Priority ปัจจุบัน",
@@ -365,15 +310,8 @@ function BreakdownPanel({ dashboard }: { readonly dashboard: ITAnalyticsDashboar
             scope: "snapshot",
             rows: dashboard.categoryBacklog,
         },
-        department: {
-            title: "Ticket ใหม่แยกตามหน่วยงาน",
-            description: "ใช้ชื่อหน่วยงานที่บันทึกไว้เมื่อสร้าง Ticket",
-            scope: "period",
-            rows: dashboard.departmentCreated,
-        },
     };
     const breakdown = breakdowns[selectedBreakdown];
-    const maximum = Math.max(0, ...breakdown.rows.map((row) => row.count));
     const handleBreakdownChange = (value: string): void => {
         const option = BREAKDOWN_OPTIONS.find((item) => item.value === value);
         if (option) setSelectedBreakdown(option.value);
@@ -382,6 +320,7 @@ function BreakdownPanel({ dashboard }: { readonly dashboard: ITAnalyticsDashboar
     return (
         <ITAnalyticsPanel
             title={breakdown.title}
+            headingLevel={2}
             scope={breakdown.scope}
             description={breakdown.description}
             action={(
@@ -402,33 +341,7 @@ function BreakdownPanel({ dashboard }: { readonly dashboard: ITAnalyticsDashboar
                 </label>
             )}
         >
-            {breakdown.rows.length === 0 ? (
-                <ITAnalyticsEmptyState>ยังไม่มีข้อมูลตามตัวกรองที่เลือก</ITAnalyticsEmptyState>
-            ) : (
-                <ul className="grid gap-x-8 gap-y-4 md:grid-cols-2">
-                    {breakdown.rows.map((row) => {
-                        const percentage = maximum === 0 ? 0 : (row.count / maximum) * 100;
-                        return (
-                            <li key={row.label} className="min-w-0">
-                                <div className="flex min-w-0 items-start justify-between gap-3">
-                                    <span className="min-w-0 break-words text-sm leading-6 text-content-body">{row.label}</span>
-                                    <strong className="shrink-0 text-sm tabular-nums text-content-heading">{formatITAnalyticsCount(row.count)}</strong>
-                                </div>
-                                <div
-                                    role="meter"
-                                    aria-label={`${row.label} ${formatITAnalyticsCount(row.count)} รายการ`}
-                                    aria-valuemin={0}
-                                    aria-valuemax={maximum || 1}
-                                    aria-valuenow={row.count}
-                                    className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-subtle"
-                                >
-                                    <div aria-hidden="true" className="h-full rounded-full bg-module-it-solid" style={{ width: `${percentage}%` }} />
-                                </div>
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
+            <ITAnalyticsCountBars rows={breakdown.rows} className="md:grid-cols-2" />
         </ITAnalyticsPanel>
     );
 }
@@ -442,29 +355,96 @@ export function ITAnalyticsReport({
     readonly navigation?: ITAnalyticsNavigation;
     readonly onCategorySelect?: (category: ITAnalyticsCategoryFilter) => void;
 }): ReactElement {
+    const { summary } = dashboard;
+    const countByStatus = new Map(dashboard.statusDistribution.map(({ status, count }) => [status, count]));
+    const backlogStatuses = IT_TICKET_ACTIVE_WORK_STATUSES.map((status) => ({
+        label: IT_TICKET_STATUS_LABELS[status],
+        count: countByStatus.get(status) ?? 0,
+    }));
+    const scrollDepartments = dashboard.departmentCreated.length > 5;
+    const priorityCount = (priority: "P0" | "P1"): number =>
+        dashboard.priorityBacklog.find((row) => row.priority === priority)?.count ?? 0;
+
     return (
-        <div className="min-w-0 space-y-5">
-            <KpiSummary dashboard={dashboard} />
-            <ITAnalyticsTopCategoriesPanel
-                topCategories={dashboard.topCategories}
-                selectedCategory={dashboard.filters.category}
-                onCategorySelect={onCategorySelect}
-            />
-            <div className="grid min-w-0 gap-5 lg:grid-cols-2">
-                <ITAnalyticsPriorityBacklogPanel
-                    rows={dashboard.priorityBacklog}
-                    getPriorityHref={navigation?.getPriorityHref}
+        <div className="min-w-0 space-y-7">
+            <PeriodOverview dashboard={dashboard} />
+            <section aria-labelledby="it-analytics-demand-title" className="min-w-0 space-y-3">
+                <h2 id="it-analytics-demand-title" className="text-lg font-semibold text-content-heading">ปริมาณงานและแนวโน้ม</h2>
+                <ITAnalyticsTrendChart trend={dashboard.trend} period={dashboard.period.key} />
+                <ITAnalyticsTopCategoriesPanel
+                    topCategories={dashboard.topCategories}
+                    selectedCategory={dashboard.filters.category}
+                    onCategorySelect={onCategorySelect}
                 />
-                <ITAnalyticsBacklogAgingPanel rows={dashboard.backlogAging} />
-            </div>
-            <div className="grid min-w-0 gap-5 lg:grid-cols-2">
+                <div className="grid min-w-0 items-start gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                    <ITAnalyticsPanel
+                        title="Ticket ใหม่แยกตามหน่วยงาน"
+                        scope="period"
+                        description={`ใช้ชื่อหน่วยงานที่บันทึกเมื่อสร้าง Ticket สัดส่วนเทียบกับ Ticket ใหม่ทั้งหมดตามตัวกรอง${scrollDepartments
+                            ? ` เลื่อนรายการเพื่อดูครบ ${formatITAnalyticsCount(dashboard.departmentCreated.length)} หน่วยงาน`
+                            : ""}`}
+                    >
+                        <div
+                            role="region"
+                            aria-label="รายการหน่วยงานทั้งหมด"
+                            tabIndex={scrollDepartments ? 0 : undefined}
+                            className={scrollDepartments
+                                ? "max-h-96 overflow-y-auto rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                : undefined}
+                        >
+                            <ITAnalyticsCountBars rows={dashboard.departmentCreated} shareTotal={summary.newTickets} />
+                        </div>
+                    </ITAnalyticsPanel>
+                    <ITAnalyticsPanel title="Ticket ใหม่แยกตามประเภท" scope="period">
+                        <ITAnalyticsCountBars
+                            rows={summary.newTickets === 0 ? [] : dashboard.typeDistribution.map(({ type, count }) => ({
+                                label: IT_TICKET_TYPE_LABELS[type],
+                                count,
+                            }))}
+                            shareTotal={summary.newTickets}
+                        />
+                    </ITAnalyticsPanel>
+                </div>
+            </section>
+            <section aria-labelledby="it-analytics-snapshot-title" aria-describedby="it-analytics-snapshot-description" className="min-w-0 space-y-3">
+                <div className="space-y-1">
+                    <h2 id="it-analytics-snapshot-title" className="text-lg font-semibold text-content-heading">สถานะงานปัจจุบัน</h2>
+                    <p id="it-analytics-snapshot-description" className="text-sm leading-6 text-content-secondary">แสดงงานค้างตามสถานะล่าสุดของ Ticket โดยใช้ตัวกรองประเภทและหมวดหมู่</p>
+                </div>
+                <dl className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
+                    <KpiCard
+                        label="งานค้างทั้งหมด"
+                        count={summary.currentBacklog}
+                        detail={summary.oldestUnresolvedAgeMinutes === null
+                            ? "ไม่มีงานค้าง"
+                            : "งานที่ค้างนานที่สุด " + formatITAnalyticsDuration(summary.oldestUnresolvedAgeMinutes)}
+                    />
+                    <KpiCard label="กำลังดำเนินการ" count={countByStatus.get("IN_PROGRESS") ?? 0} />
+                    <KpiCard label="รอข้อมูลจากผู้แจ้ง" count={summary.waitingRequester} />
+                    <KpiCard
+                        label="งานเร่งด่วน P0 / P1"
+                        count={summary.highPriorityBacklog}
+                        detail={`P0 ${formatITAnalyticsCount(priorityCount("P0"))} · P1 ${formatITAnalyticsCount(priorityCount("P1"))}`}
+                    />
+                </dl>
+                <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+                    <ITAnalyticsPanel title="งานค้างแยกตามสถานะ" scope="snapshot">
+                        <ITAnalyticsCountBars rows={summary.currentBacklog === 0 ? [] : backlogStatuses} />
+                    </ITAnalyticsPanel>
+                    <ITAnalyticsPriorityBacklogPanel
+                        rows={dashboard.priorityBacklog}
+                        getPriorityHref={navigation?.getPriorityHref}
+                    />
+                </div>
                 <AttentionPanel dashboard={dashboard} navigation={navigation} />
-                <ITAnalyticsWorkloadPanel
-                    rows={dashboard.assigneeBacklog}
-                    unassignedHref={navigation?.unassignedHref}
-                />
-            </div>
-            <ITAnalyticsTrendChart trend={dashboard.trend} period={dashboard.period.key} />
+                <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+                    <ITAnalyticsBacklogAgingPanel rows={dashboard.backlogAging} />
+                    <ITAnalyticsWorkloadPanel
+                        rows={dashboard.assigneeBacklog}
+                        unassignedHref={navigation?.unassignedHref}
+                    />
+                </div>
+            </section>
             <BreakdownPanel dashboard={dashboard} />
         </div>
     );
@@ -643,12 +623,12 @@ export function ITAnalyticsDashboard({
 } = {}): ReactElement {
     const [localState, setLocalState] = useState<ITAnalyticsReportState>(IT_ANALYTICS_DEFAULT_REPORT_STATE);
     const state = controlledState ?? localState;
-    const [retryCount, setRetryCount] = useState(0);
+    const [refreshCount, setRefreshCount] = useState(0);
     const [requestState, setRequestState] = useState<RequestState | null>(null);
     const [categoryOptions, setCategoryOptions] = useState<readonly CategoryOption[]>([]);
     const latestRequestId = useRef(0);
     const stateKey = getITAnalyticsReportStateKey(state);
-    const requestKey = `${stateKey}:${retryCount}`;
+    const requestKey = `${stateKey}:${refreshCount}`;
     const visibleState = requestState?.key === requestKey ? requestState : null;
     const apiQuery = toITAnalyticsApiQuery(state);
 
@@ -657,7 +637,7 @@ export function ITAnalyticsDashboard({
         const requestId = ++latestRequestId.current;
         const url = `${API_ROUTES.itAnalytics.dashboard}?${apiQuery}`;
 
-        void fetch(url, { signal: controller.signal })
+        void fetch(url, { signal: controller.signal, cache: "no-store" })
             .then(async (response) => {
                 const payload: unknown = await response.json().catch(() => null);
                 if (!response.ok) throw new ITAnalyticsRequestError(readITAnalyticsError(response.status));
@@ -691,21 +671,34 @@ export function ITAnalyticsDashboard({
     };
 
     const reportState = visibleState;
+    const refreshReport = (): void => setRefreshCount((current) => current + 1);
+    const Heading = embedded ? "h2" : "h1";
     const navigation = canOpenOperatorQueue && reportState?.kind === "loaded"
         ? buildITAnalyticsQueueDestinations(reportState.data.filters)
         : undefined;
     return (
         <section className="mx-auto w-full max-w-7xl min-w-0 space-y-5">
             <header className={`min-w-0 space-y-4 ${embedded ? "" : "border-b border-border-neutral pb-5"}`}>
-                {!embedded ? <div className="min-w-0 space-y-2">
-                    <h1 data-page-heading tabIndex={-1} className="flex items-center gap-2 text-2xl font-bold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-3xl">
-                        <BarChart3 aria-hidden="true" className="size-7 shrink-0 text-sky-700" />
-                        รายงาน IT
-                    </h1>
-                    <p className="max-w-[70ch] text-sm leading-6 text-content-secondary">
-                        ภาพรวมงานค้างและผลการให้บริการ IT ตามช่วงเวลาที่เลือก
-                    </p>
-                </div> : null}
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                        <Heading
+                            data-page-heading={embedded ? undefined : true}
+                            tabIndex={embedded ? undefined : -1}
+                            className="text-xl font-semibold tracking-tight text-content-heading [overflow-wrap:anywhere] md:text-2xl"
+                        >
+                            รายงานการให้บริการ IT
+                        </Heading>
+                        <p className="text-sm leading-6 text-content-secondary">
+                            ติดตาม Ticket ที่รับเข้าและแก้ไข พร้อมงานค้างที่ต้องติดตาม
+                        </p>
+                    </div>
+                    {reportState?.kind !== "error" ? (
+                        <Button type="button" variant="outline" className="min-h-11 gap-2" disabled={reportState === null} onClick={refreshReport}>
+                            <RotateCw aria-hidden="true" className="size-4" />
+                            อัปเดตรายงาน
+                        </Button>
+                    ) : null}
+                </div>
                 <ReportFilters state={state} categoryOptions={categoryOptions} onChange={handleStateChange} />
                 <ActiveFilterSummary state={state} categoryOptions={categoryOptions} />
                 {reportState?.kind === "loaded" ? <ReportingWindow dashboard={reportState.data} /> : null}
@@ -726,7 +719,7 @@ export function ITAnalyticsDashboard({
                         type="button"
                         variant="outline"
                         className="min-h-11 shrink-0 gap-2"
-                        onClick={() => setRetryCount((current) => current + 1)}
+                        onClick={refreshReport}
                     >
                         <RotateCw aria-hidden="true" className="size-4" />
                         ลองอีกครั้ง

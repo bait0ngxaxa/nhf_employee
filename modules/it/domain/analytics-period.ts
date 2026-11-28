@@ -9,6 +9,10 @@ export interface ITAnalyticsPeriodBounds {
     readonly startAt: Date;
     readonly endAt: Date;
     readonly dates: readonly string[];
+    readonly previous: {
+        readonly startAt: Date;
+        readonly endAt: Date;
+    };
 }
 
 interface CalendarDate {
@@ -104,10 +108,18 @@ export function getITAnalyticsPeriodBounds(
         formatCalendarDate(addCalendarDays(firstDay, index)),
     );
 
+    const startAt = getLocalMidnight(firstDay);
+    const elapsedMs = now.getTime() - startAt.getTime();
     return {
         key,
-        startAt: getLocalMidnight(firstDay),
+        startAt,
         endAt: new Date(now),
         dates,
+        // The current Bangkok calendar window includes a partial day. Match
+        // its elapsed length and end the comparison exactly at its start.
+        previous: {
+            startAt: new Date(startAt.getTime() - elapsedMs),
+            endAt: new Date(startAt),
+        },
     };
 }

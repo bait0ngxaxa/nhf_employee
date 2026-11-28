@@ -79,12 +79,16 @@ export function workspaceResponse(pathname, scenario) {
                 generatedAt: "2026-11-24T03:00:00.000Z",
                 timeZone: "Asia/Bangkok",
                 period: { key: "30D", startAt: "2026-10-25T17:00:00.000Z", endAt: "2026-11-24T03:00:00.000Z" },
+                previousPeriod: {
+                    startAt: "2026-09-26T07:00:00.000Z", endAt: "2026-10-25T17:00:00.000Z",
+                    newTickets: { count: 0, percentageChange: 0 }, resolvedTickets: { count: 0, percentageChange: 0 },
+                },
                 filters: { type: null, category: null },
                 filterOptions: { categories: [] },
                 summary: {
                     currentBacklog: 0, waitingRequester: 0, unassignedBacklog: 0, untriagedBacklog: 0,
                     highPriorityBacklog: 0, agedBacklog: 0, oldestUnresolvedAgeMinutes: null,
-                    newTickets: 0, resolvedTickets: 0,
+                    newTickets: 0, resolvedTickets: 0, closedTickets: 0, cancelledTickets: 0, reopenedTickets: 0,
                 },
                 trend: [], statusDistribution: [], typeDistribution: [], priorityDistribution: [],
                 priorityBacklog: [],
