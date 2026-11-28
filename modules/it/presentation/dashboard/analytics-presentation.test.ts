@@ -17,6 +17,12 @@ const response = {
             startAt: "2026-08-27T17:00:00.000Z",
             endAt: "2026-09-25T17:05:00.000Z",
         },
+        previousPeriod: {
+            startAt: "2026-07-29T16:55:00.000Z",
+            endAt: "2026-08-27T17:00:00.000Z",
+            newTickets: { count: 0, percentageChange: 0 as number | null },
+            resolvedTickets: { count: 0, percentageChange: 0 as number | null },
+        },
         filters: { type: null, category: null } as { type: string | null; category: number | string | null },
         filterOptions: {
             categories: [
@@ -34,6 +40,9 @@ const response = {
             oldestUnresolvedAgeMinutes: 42,
             newTickets: 0,
             resolvedTickets: 0,
+            closedTickets: 0,
+            cancelledTickets: 0,
+            reopenedTickets: 0,
         },
         trend: [{ date: "2026-09-26", created: 0, resolved: 0 }],
         statusDistribution: [
@@ -88,7 +97,8 @@ describe("IT analytics presentation contract", () => {
         expect(parseITAnalyticsDashboardResponse(response)).toMatchObject({
             timeZone: "Asia/Bangkok",
             period: { key: "30D" },
-            summary: { currentBacklog: 1, resolvedTickets: 0, oldestUnresolvedAgeMinutes: 42 },
+            previousPeriod: response.dashboard.previousPeriod,
+            summary: { currentBacklog: 1, resolvedTickets: 0, oldestUnresolvedAgeMinutes: 42, reopenedTickets: 0 },
             trend: [{ date: "2026-09-26", created: 0, resolved: 0 }],
         });
     });
@@ -113,6 +123,25 @@ describe("IT analytics presentation contract", () => {
     });
 
     it.each([
+        ["an overlapping comparison window", (value: typeof response) => {
+            value.dashboard.previousPeriod.endAt = "2026-08-27T17:00:01.000Z";
+        }],
+        ["a shorter comparison window", (value: typeof response) => {
+            value.dashboard.previousPeriod.startAt = "2026-07-29T16:56:00.000Z";
+        }],
+        ["a non-finite comparison", (value: typeof response) => {
+            value.dashboard.previousPeriod.newTickets.percentageChange = Infinity;
+        }],
+        ["a percentage over zero baseline", (value: typeof response) => {
+            value.dashboard.previousPeriod.newTickets.percentageChange = 100;
+        }],
+        ["a null change over a positive baseline", (value: typeof response) => {
+            value.dashboard.previousPeriod.resolvedTickets = { count: 1, percentageChange: null };
+        }],
+        ["a missing lifecycle count", (value: typeof response) => {
+            const { reopenedTickets: _removed, ...summary } = value.dashboard.summary;
+            Object.assign(value.dashboard, { summary });
+        }],
         ["an unknown filter category", (value: typeof response) => {
             value.dashboard.filters = { type: null, category: "OTHER" };
         }],

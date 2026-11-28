@@ -8,6 +8,7 @@ import {
     IT_TICKET_STATUS_OPTIONS,
     IT_TICKET_TYPE_OPTIONS,
     type ITAnalyticsCategoryFilter,
+    type ITAnalyticsCountComparison,
     type ITAnalyticsDashboard as ITAnalyticsDashboardDTO,
 } from "../../contracts";
 import type { ITTicketPriority, ITTicketStatus, ITTicketType } from "@prisma/client";
@@ -181,6 +182,31 @@ function parseBacklogAging(value: unknown): ITAnalyticsDashboardDTO["backlogAgin
     return rows;
 }
 
+function parseCountComparison(value: unknown): ITAnalyticsCountComparison | null {
+    if (!isRecord(value)
+        || !hasExactKeys(value, ["count", "percentageChange"])
+        || !isNonNegativeInteger(value.count)) return null;
+
+    const change = value.percentageChange;
+    if (change === null) return value.count === 0 ? { count: value.count, percentageChange: null } : null;
+    if (typeof change !== "number" || !Number.isFinite(change) || change < -100
+        || (value.count === 0 && change !== 0)) return null;
+    return { count: value.count, percentageChange: change };
+}
+
+function parsePreviousPeriod(value: unknown): ITAnalyticsDashboardDTO["previousPeriod"] | null {
+    if (!isRecord(value)
+        || !hasExactKeys(value, ["startAt", "endAt", "newTickets", "resolvedTickets"])
+        || !isTimestamp(value.startAt)
+        || !isTimestamp(value.endAt)) return null;
+
+    const newTickets = parseCountComparison(value.newTickets);
+    const resolvedTickets = parseCountComparison(value.resolvedTickets);
+    return newTickets === null || resolvedTickets === null
+        ? null
+        : { startAt: value.startAt, endAt: value.endAt, newTickets, resolvedTickets };
+}
+
 export function parseITAnalyticsDashboardResponse(
     value: unknown,
 ): ITAnalyticsDashboardDTO | null {
@@ -195,6 +221,7 @@ export function parseITAnalyticsDashboardResponse(
         "generatedAt",
         "timeZone",
         "period",
+        "previousPeriod",
         "filters",
         "filterOptions",
         "summary",
@@ -227,6 +254,9 @@ export function parseITAnalyticsDashboardResponse(
             "oldestUnresolvedAgeMinutes",
             "newTickets",
             "resolvedTickets",
+            "closedTickets",
+            "cancelledTickets",
+            "reopenedTickets",
         ])) {
         return null;
     }
@@ -241,6 +271,9 @@ export function parseITAnalyticsDashboardResponse(
         "agedBacklog",
         "newTickets",
         "resolvedTickets",
+        "closedTickets",
+        "cancelledTickets",
+        "reopenedTickets",
     ] as const;
     if (countKeys.some((key) => !isNonNegativeInteger(summary[key]))) return null;
     const oldestUnresolvedAgeMinutes = summary.oldestUnresolvedAgeMinutes;
@@ -284,15 +317,21 @@ export function parseITAnalyticsDashboardResponse(
     const departmentCreated = parseLabelCounts(dashboard.departmentCreated);
     const priorityDistribution = parsePriorityCounts(dashboard.priorityDistribution);
     const priorityBacklog = parsePriorityCounts(dashboard.priorityBacklog);
+    const previousPeriod = parsePreviousPeriod(dashboard.previousPeriod);
     const filters = parseFilters(dashboard.filters);
     const filterOptions = parseFilterOptions(dashboard.filterOptions);
     const topCategories = parseTopCategories(dashboard.topCategories);
     const backlogAging = parseBacklogAging(dashboard.backlogAging);
     if (categoryBacklog === null || assigneeBacklog === null || departmentCreated === null
         || priorityDistribution === null || priorityBacklog === null || filters === null
-        || filterOptions === null || topCategories === null || backlogAging === null) {
+        || previousPeriod === null || filterOptions === null || topCategories === null || backlogAging === null) {
         return null;
     }
+
+    const currentStart = Date.parse(dashboard.period.startAt);
+    const currentLength = Date.parse(dashboard.period.endAt) - currentStart;
+    if (currentLength <= 0 || Date.parse(previousPeriod.endAt) !== currentStart
+        || currentStart - Date.parse(previousPeriod.startAt) !== currentLength) return null;
 
     return {
         generatedAt: dashboard.generatedAt,
@@ -302,6 +341,7 @@ export function parseITAnalyticsDashboardResponse(
             startAt: dashboard.period.startAt,
             endAt: dashboard.period.endAt,
         },
+        previousPeriod,
         filters,
         filterOptions,
         summary: {
@@ -314,6 +354,9 @@ export function parseITAnalyticsDashboardResponse(
             oldestUnresolvedAgeMinutes,
             newTickets: summary.newTickets as number,
             resolvedTickets: summary.resolvedTickets as number,
+            closedTickets: summary.closedTickets as number,
+            cancelledTickets: summary.cancelledTickets as number,
+            reopenedTickets: summary.reopenedTickets as number,
         },
         trend,
         statusDistribution,

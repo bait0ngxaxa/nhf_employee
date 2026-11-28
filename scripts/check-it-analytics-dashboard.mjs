@@ -47,6 +47,7 @@ const bundle = await build({
             import { ITAnalyticsReport } from "./modules/it/presentation/dashboard/ITAnalyticsDashboard";
             import { ITWorkspace } from "./modules/it/presentation/dashboard/ITWorkspace";
             import { buildITAnalyticsQueueDestinations } from "./modules/it/presentation/dashboard/analytics-url-state";
+            import { getITAnalyticsPeriodBounds } from "./modules/it/domain/analytics-period";
             const params = new URLSearchParams(location.search);
             const empty = params.get("empty") === "1";
             const linked = params.get("linked") === "1";
@@ -55,24 +56,45 @@ const bundle = await build({
                 "กล้องวงจรปิด", "อื่น ๆ"];
             const rows = empty ? [] : names.map((label, index) => ({ categoryId: index + 1, label, count: 42 - index * 4 }));
             if (!empty) rows.splice(3, 0, { categoryId: null, label: "ยังไม่จัดหมวดหมู่", count: 30 });
-            const trend = Array.from({ length: 30 }, (_, index) => ({
-                date: new Date(Date.UTC(2026, 9, 8 + index)).toISOString().slice(0, 10),
-                created: empty ? 0 : (index * 7) % 9, resolved: empty ? 0 : (index * 5) % 7,
-            }));
+            const now = new Date("2026-11-07T03:00:00.000Z");
+            const reportWindow = (key) => {
+                const bounds = getITAnalyticsPeriodBounds(key, now);
+                const period = { key, startAt: bounds.startAt.toISOString(), endAt: bounds.endAt.toISOString() };
+                const previousPeriod = {
+                    startAt: bounds.previous.startAt.toISOString(), endAt: bounds.previous.endAt.toISOString(),
+                    newTickets: empty ? { count: 0, percentageChange: 0 } : { count: 148, percentageChange: 100 },
+                    resolvedTickets: empty ? { count: 0, percentageChange: 0 } : { count: 300, percentageChange: -29 / 3 },
+                };
+                const weights = bounds.dates.map((_, index) => 1 + (index * 7) % 9);
+                const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+                let cumulativeWeight = 0;
+                const trend = bounds.dates.map((date, index) => {
+                    const start = cumulativeWeight / totalWeight;
+                    cumulativeWeight += weights[index];
+                    const end = cumulativeWeight / totalWeight;
+                    return {
+                        date,
+                        created: empty ? 0 : Math.floor(296 * end) - Math.floor(296 * start),
+                        resolved: empty ? 0 : Math.floor(271 * end) - Math.floor(271 * start),
+                    };
+                });
+                return { period, previousPeriod, trend };
+            };
             const priorities = ["P0", "P1", "P2", "P3"];
             const dashboard = {
-                generatedAt: "2026-11-07T03:00:00.000Z", timeZone: "Asia/Bangkok",
-                period: { key: "30D", startAt: "2026-10-08T17:00:00.000Z", endAt: "2026-11-07T03:00:00.000Z" },
+                generatedAt: now.toISOString(), timeZone: "Asia/Bangkok",
+                ...reportWindow("30D"),
                 filters: { type: null, category: null },
                 filterOptions: { categories: names.map((name, index) => ({ id: index + 1, key: "K" + index, name, isActive: index !== 9 })) },
                 summary: empty ? {
                     currentBacklog: 0, waitingRequester: 0, unassignedBacklog: 0, untriagedBacklog: 0, highPriorityBacklog: 0,
                     agedBacklog: 0, oldestUnresolvedAgeMinutes: null, newTickets: 0, resolvedTickets: 0,
+                    closedTickets: 0, cancelledTickets: 0, reopenedTickets: 0,
                 } : {
                     currentBacklog: 64, waitingRequester: 6, unassignedBacklog: 9, untriagedBacklog: 5, highPriorityBacklog: 11,
                     agedBacklog: 14, oldestUnresolvedAgeMinutes: 38_000, newTickets: 296, resolvedTickets: 271,
+                    closedTickets: 240, cancelledTickets: 9, reopenedTickets: 14,
                 },
-                trend,
                 statusDistribution: ["OPEN", "IN_PROGRESS", "WAITING_REQUESTER", "RESOLVED", "CLOSED", "CANCELLED"]
                     .map((status, index) => ({ status, count: empty ? 0 : [30, 28, 6, 12, 240, 9][index] })),
                 typeDistribution: ["INCIDENT", "SERVICE_REQUEST", "SUGGESTION"].map((type, index) => ({ type, count: empty ? 0 : [180, 104, 12][index] })),
@@ -87,7 +109,19 @@ const bundle = await build({
                     ...Array.from({ length: 7 }, (_, index) => ({ label: "เจ้าหน้าที่ " + (index + 1), count: 6 - Math.floor(index / 2) })),
                     { label: "ผู้รับผิดชอบเดิม", count: 2 },
                 ],
-                departmentCreated: empty ? [] : [{ label: "ฝ่ายบริหาร", count: 120 }, { label: "ไม่ระบุหน่วยงาน", count: 4 }],
+                departmentCreated: empty ? [] : [
+                    { label: "สำนักงานประสานงานโครงการและส่งเสริมการมีส่วนร่วมของชุมชน", count: 112 },
+                    { label: "ฝ่ายบริหารและทรัพยากรบุคคล", count: 79 },
+                    { label: "ฝ่ายพัฒนานโยบาย", count: 33 },
+                    { label: "ฝ่ายบัญชีและการเงิน", count: 19 },
+                    { label: "ฝ่ายสื่อสารองค์กร", count: 14 },
+                    { label: "ศูนย์ข้อมูลและประสานงาน", count: 11 },
+                    { label: "ฝ่ายบริการสำนักงาน", count: 9 },
+                    { label: "กลุ่มงานวิชาการ", count: 7 },
+                    { label: "สำนักงานเดิม", count: 6 },
+                    { label: "ไม่ระบุหน่วยงาน", count: 4 },
+                    { label: "ฝ่ายแผนงาน", count: 2 },
+                ],
             };
             const navigation = linked ? buildITAnalyticsQueueDestinations(dashboard.filters) : undefined;
             if (params.get("full") === "1") {
@@ -102,7 +136,7 @@ const bundle = await build({
                     const filteredRows = category === null ? rows.slice(0, 10) : rows.filter((row) => String(row.categoryId ?? "uncategorized") === category);
                     if (params.get("loading") === "1") return new Promise(() => {});
                     return new Response(JSON.stringify({ success: true, dashboard: { ...dashboard,
-                        filters, period: { ...dashboard.period, key: query.get("period") },
+                        filters, ...reportWindow(query.get("period")),
                         topCategories: { ...dashboard.topCategories, rows: filteredRows, otherCategoryCount: category === null ? 1 : 0, otherTicketCount: category === null ? 6 : 0 },
                     } }), { status: params.get("error") === "1" ? 503 : 200, headers: { "Content-Type": "application/json" } });
                 };
@@ -138,8 +172,9 @@ const browser = await puppeteer.launch({
 });
 const failures = [];
 let cases = 0;
-const widths = process.argv[2] ? [Number(process.argv[2])] : [320, 390, 768, 1280];
-assert.ok(widths.every((width) => [320, 390, 768, 1280].includes(width)), "Use a supported viewport width");
+const supportedWidths = [320, 390, 768, 1024, 1440];
+const widths = process.argv[2] ? [Number(process.argv[2])] : supportedWidths;
+assert.ok(widths.every((width) => supportedWidths.includes(width)), "Use a supported viewport width");
 try {
     for (const width of widths) {
         for (const variant of ["data", "linked", "empty", "full", "full-operator", "loading", "error"]) {
@@ -157,6 +192,9 @@ try {
                     if (variant === "loading" || variant === "error") {
                         const selector = variant === "loading" ? '[aria-label="กำลังโหลดรายงาน IT"]' : '[role="alert"]';
                         await page.waitForSelector(selector);
+                        if (variant === "loading") {
+                            assert.equal(await page.$eval('button[disabled]', (button) => button.disabled), true);
+                        }
                         assert.equal(await page.$$eval('[aria-label="ตัวกรองรายงาน"] [role="combobox"]', (items) => items.length), 3);
                         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
                         if (variant === "error") {
@@ -181,11 +219,14 @@ try {
                             .slice(0, 3)
                             .map((element) => `${element.tagName}.${String(element.className).slice(0, 60)}`),
                         sections: document.querySelectorAll("main section").length,
-                        kpiGroups: [...document.querySelectorAll('[aria-labelledby="it-analytics-overview-title"] > dl')]
+                        kpiGroups: [...document.querySelectorAll(
+                            '[aria-labelledby="it-analytics-period-title"] dl, [aria-labelledby="it-analytics-snapshot-title"] > dl',
+                        )]
                             .map((group) => ({
                                 metrics: group.querySelectorAll("dt").length,
                                 columns: getComputedStyle(group).gridTemplateColumns.split(" ").length,
                             })),
+                        departmentCount: document.querySelectorAll('[aria-label="รายการหน่วยงานทั้งหมด"] li').length,
                         hasDurationMetrics: /ตอบกลับครั้งแรกเฉลี่ย|เวลาแก้ไขเฉลี่ย|ประสิทธิภาพการให้บริการ/.test(document.querySelector("main").textContent),
                         smallTargets: [...document.querySelectorAll("main a, main button")]
                             .filter((element) => element.getBoundingClientRect().height < 36)
@@ -194,9 +235,19 @@ try {
                     assert.equal(layout.overflow, false, `page must not overflow horizontally: ${layout.overflowing.join(", ")}`);
                     assert.ok(layout.sections >= 8, "every remaining report section must render");
                     assert.deepEqual(layout.kpiGroups, [
-                        { metrics: 4, columns: width >= 1024 ? 4 : 2 },
                         { metrics: 2, columns: 2 },
-                    ], "both KPI groups must fill their grid");
+                        { metrics: 3, columns: 3 },
+                        { metrics: 4, columns: width >= 1280 ? 4 : 2 },
+                    ], "all KPI groups must fill their grid");
+                    assert.equal(layout.departmentCount, variant === "empty" ? 0 : 11, "all department rows must be present");
+                    if (variant === "full" || variant === "full-operator") {
+                        const departmentList = '[aria-label="รายการหน่วยงานทั้งหมด"]';
+                        await page.$eval(departmentList, (element) => element.focus());
+                        await page.keyboard.press("End");
+                        await page.waitForFunction((selector) => document.querySelector(selector)?.scrollTop > 0, {}, departmentList);
+                        await page.$eval(departmentList, (element) => { element.scrollTop = 0; });
+                        await page.evaluate(() => window.scrollTo(0, 0));
+                    }
                     assert.equal(layout.hasDurationMetrics, false, "duration metrics must be absent");
                     assert.deepEqual(layout.smallTargets, [], "interactive targets must stay touch-sized");
                     if (variant !== "empty") {
@@ -214,7 +265,8 @@ try {
                                 (element) => element.focus());
                             await page.keyboard.press("ArrowRight");
                             await page.waitForFunction(() =>
-                                document.querySelector(".recharts-tooltip-wrapper")?.textContent?.includes("Ticket"));
+                                document.querySelector('[aria-label="กราฟแท่งหมวดปัญหา เรียงจากมากไปน้อย"] .recharts-tooltip-wrapper')
+                                    ?.textContent?.includes("Ticket"));
                         }
                     }
                     if (variant === "full" || variant === "full-operator") {
@@ -233,11 +285,13 @@ try {
                     } else {
                         assert.equal(await page.$$eval("main a", (links) => links.length), 0, "analytics-only view must not link to Tickets");
                     }
-                    if (screenshotDirectory && (width === 390 || width === 1280) && variant !== "linked" && !(variant === "full" && dark)) {
+                    if (screenshotDirectory && (width === 390 || width === 1440) && (variant === "full" || variant === "full-operator")) {
                         const name = `it-analytics-${width}-${variant}-${dark ? "dark" : "light"}`;
                         const fullHeight = await page.evaluate(() => document.documentElement.scrollHeight);
-                        const sliceHeight = width < 768 ? 1400 : fullHeight;
+                        const sliceHeight = 1400;
                         for (let top = 0, index = 0; top < fullHeight; top += sliceHeight, index += 1) {
+                            await page.evaluate((y) => window.scrollTo(0, y), top);
+                            await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
                             await page.screenshot({
                                 path: join(screenshotDirectory, `${name}-${index}.png`),
                                 captureBeyondViewport: true,

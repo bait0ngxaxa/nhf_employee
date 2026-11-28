@@ -3,6 +3,7 @@ import {
     IT_TICKET_PRIORITY_LABELS,
     type ITAnalyticsBacklogAgeBucketKey,
     type ITAnalyticsDashboard,
+    type ITAnalyticsCountComparison,
 } from "../../contracts";
 import type { ITTicketPriority } from "@prisma/client";
 
@@ -32,6 +33,19 @@ export function formatITAnalyticsShare(count: number, total: number): string {
         minimumFractionDigits: 0,
         maximumFractionDigits: 1,
     })}%`;
+}
+
+export function formatITAnalyticsComparison(
+    current: number,
+    { count, percentageChange }: ITAnalyticsCountComparison,
+): string {
+    if (percentageChange === null) return `เพิ่มขึ้น ${formatITAnalyticsCount(current)} Ticket · ช่วงก่อนหน้า 0 Ticket`;
+
+    const previous = `ช่วงก่อนหน้า ${formatITAnalyticsCount(count)} Ticket`;
+    if (percentageChange === 0) return `เท่าเดิม · ${previous}`;
+    const magnitude = Math.abs(percentageChange);
+    const change = magnitude < 0.1 ? "<0.1%" : `${magnitude.toLocaleString("th-TH", { maximumFractionDigits: 1 })}%`;
+    return `${percentageChange > 0 ? "เพิ่มขึ้น" : "ลดลง"} ${change} · ${previous}`;
 }
 
 export interface ITAnalyticsPrioritySlice {

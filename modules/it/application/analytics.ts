@@ -20,11 +20,13 @@ import {
     IT_TICKET_STATUS_OPTIONS,
     IT_TICKET_TYPE_OPTIONS,
     type ITAnalyticsCategoryFilter,
+    type ITAnalyticsCountComparison,
     type ITAnalyticsDashboard,
     type ITAnalyticsPeriod,
 } from "../contracts";
 import { getITBacklogAgeBucketBounds } from "../domain/analytics-backlog-aging";
 import { getITAnalyticsLocalDate, getITAnalyticsPeriodBounds } from "../domain/analytics-period";
+import { IT_TICKET_ACTIVE_WORK_STATUSES } from "../domain/ticket-workflow";
 import {
     ITCapabilityDeniedError,
     resolveITCapabilityInTransaction,
@@ -32,12 +34,6 @@ import {
 } from "./authorization";
 import { assertITActorCurrentWorkforce } from "./workforce";
 import { readITAnalyticsPersistenceSnapshot } from "../infrastructure/persistence/ticket-analytics-repository";
-
-const CURRENT_BACKLOG_STATUSES = Object.freeze([
-    ITTicketStatus.OPEN,
-    ITTicketStatus.IN_PROGRESS,
-    ITTicketStatus.WAITING_REQUESTER,
-] as const);
 
 export class ITAnalyticsInputValidationError extends Error {
     constructor(message = "ช่วงเวลารายงานไม่ถูกต้อง") {
@@ -100,6 +96,13 @@ function parseITAnalyticsDashboardQuery(
     return {
         period: parseITAnalyticsPeriod(period),
         filters: parseITAnalyticsFilters(filters),
+    };
+}
+
+function compareTicketCounts(current: number, previous: number): ITAnalyticsCountComparison {
+    return {
+        count: previous,
+        percentageChange: previous === 0 ? (current === 0 ? 0 : null) : ((current - previous) / previous) * 100,
     };
 }
 
@@ -235,7 +238,8 @@ export async function getITAnalyticsDashboard(
         const persistence = await readITAnalyticsPersistenceSnapshot(tx, {
             startAt: bounds.startAt,
             endAt: bounds.endAt,
-            backlogStatuses: CURRENT_BACKLOG_STATUSES,
+            previousStartAt: bounds.previous.startAt,
+            backlogStatuses: IT_TICKET_ACTIVE_WORK_STATUSES,
             resolutionEventKind: ITTicketEventKind.STATUS_CHANGED,
             resolutionStatus: ITTicketStatus.RESOLVED,
             scope: filters,
@@ -351,11 +355,8 @@ export async function getITAnalyticsDashboard(
             if (bucket) bucket.resolved += 1;
         }
 
-        const backlogByStatus = new Map(
-            persistence.statuses.map((row) => [row.status, row.count]),
-        );
-        const currentBacklog = CURRENT_BACKLOG_STATUSES.reduce(
-            (total, status) => total + (backlogByStatus.get(status) ?? 0),
+        const currentBacklog = IT_TICKET_ACTIVE_WORK_STATUSES.reduce(
+            (total, status) => total + (statusCountMap.get(status) ?? 0),
             0,
         );
         const unassignedBacklog = persistence.backlogAssignees.find(
@@ -376,6 +377,7 @@ export async function getITAnalyticsDashboard(
             .filter((bucket) => bucket.minDays >= IT_ANALYTICS_AGED_BACKLOG_MIN_DAYS)
             .reduce((total, bucket) => total + (backlogAgeCountMap.get(bucket.key) ?? 0), 0);
 
+        const resolvedTickets = persistence.resolvedEvents.length;
         return {
             generatedAt: now.toISOString(),
             timeZone: IT_ANALYTICS_TIME_ZONE,
@@ -383,6 +385,12 @@ export async function getITAnalyticsDashboard(
                 key: bounds.key,
                 startAt: bounds.startAt.toISOString(),
                 endAt: bounds.endAt.toISOString(),
+            },
+            previousPeriod: {
+                startAt: bounds.previous.startAt.toISOString(),
+                endAt: bounds.previous.endAt.toISOString(),
+                newTickets: compareTicketCounts(persistence.newTicketCount, persistence.previousNewTicketCount),
+                resolvedTickets: compareTicketCounts(resolvedTickets, persistence.previousResolvedTicketCount),
             },
             filters: { type: filters.type, category: filters.category },
             filterOptions: {
@@ -392,7 +400,7 @@ export async function getITAnalyticsDashboard(
             },
             summary: {
                 currentBacklog,
-                waitingRequester: backlogByStatus.get(ITTicketStatus.WAITING_REQUESTER) ?? 0,
+                waitingRequester: statusCountMap.get(ITTicketStatus.WAITING_REQUESTER) ?? 0,
                 unassignedBacklog,
                 untriagedBacklog: persistence.untriagedBacklogCount,
                 highPriorityBacklog,
@@ -404,7 +412,10 @@ export async function getITAnalyticsDashboard(
                         Math.floor((now.getTime() - persistence.backlogOldestCreatedAt.getTime()) / 60_000),
                     ),
                 newTickets: persistence.newTicketCount,
-                resolvedTickets: persistence.resolvedEvents.length,
+                resolvedTickets,
+                closedTickets: persistence.closedTicketCount,
+                cancelledTickets: persistence.cancelledTicketCount,
+                reopenedTickets: persistence.reopenedTicketCount,
             },
             trend: bounds.dates.map((date) => ({
                 date,

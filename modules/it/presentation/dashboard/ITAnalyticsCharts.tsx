@@ -48,6 +48,7 @@ export function ITAnalyticsPanel({
     description,
     scope,
     action,
+    headingLevel = 3,
     className = "",
     children,
 }: {
@@ -55,10 +56,12 @@ export function ITAnalyticsPanel({
     readonly description?: ReactNode;
     readonly scope: ITAnalyticsScope;
     readonly action?: ReactNode;
+    readonly headingLevel?: 2 | 3;
     readonly className?: string;
     readonly children: ReactNode;
 }): ReactElement {
     const headingId = useId();
+    const Heading = headingLevel === 2 ? "h2" : "h3";
     return (
         <section
             aria-labelledby={headingId}
@@ -67,9 +70,9 @@ export function ITAnalyticsPanel({
             <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-4 gap-y-2">
                 <div className="min-w-0 flex-1 basis-60">
                     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-                        <h2 id={headingId} className="text-lg font-semibold text-content-heading [text-wrap:balance]">
+                        <Heading id={headingId} className="text-lg font-semibold text-content-heading [text-wrap:balance]">
                             {title}
-                        </h2>
+                        </Heading>
                         <ITAnalyticsScopeBadge scope={scope} />
                     </div>
                     {description ? (
@@ -88,6 +91,50 @@ export function ITAnalyticsEmptyState({ children }: { readonly children: ReactNo
         <p role="status" className="rounded-lg bg-surface-subtle px-4 py-6 text-center text-sm leading-6 text-content-secondary">
             {children}
         </p>
+    );
+}
+
+export function ITAnalyticsCountBars({
+    rows,
+    shareTotal,
+    className = "",
+}: {
+    readonly rows: readonly { readonly label: string; readonly count: number }[];
+    readonly shareTotal?: number;
+    readonly className?: string;
+}): ReactElement {
+    if (rows.length === 0) {
+        return <ITAnalyticsEmptyState>ยังไม่มีข้อมูลตามตัวกรองที่เลือก</ITAnalyticsEmptyState>;
+    }
+
+    const maximum = shareTotal ?? rows.reduce((max, row) => Math.max(max, row.count), 0);
+    return (
+        <ul className={`grid gap-4 ${className}`}>
+            {rows.map((row) => {
+                const width = maximum === 0 ? 0 : (row.count / maximum) * 100;
+                return (
+                    <li key={row.label} className="min-w-0">
+                        <div className="flex min-w-0 items-start justify-between gap-3 text-sm leading-6">
+                            <span className="min-w-0 text-content-body [overflow-wrap:anywhere]">{row.label}</span>
+                            <span className="shrink-0 whitespace-nowrap tabular-nums text-content-secondary">
+                                <strong className="text-content-heading">{formatITAnalyticsCount(row.count)}</strong>
+                                {shareTotal !== undefined ? ` Ticket · ${formatITAnalyticsShare(row.count, shareTotal)}` : null}
+                            </span>
+                        </div>
+                        <div
+                            role="meter"
+                            aria-label={`${row.label} ${formatITAnalyticsCount(row.count)} รายการ`}
+                            aria-valuemin={0}
+                            aria-valuemax={maximum || 1}
+                            aria-valuenow={row.count}
+                            className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-subtle"
+                        >
+                            <div aria-hidden="true" className="h-full rounded-full bg-module-it-solid" style={{ width: `${width}%` }} />
+                        </div>
+                    </li>
+                );
+            })}
+        </ul>
     );
 }
 

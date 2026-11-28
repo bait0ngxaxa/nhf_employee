@@ -11,6 +11,7 @@ describe("IT Ticket analytics persistence", () => {
     it("uses period predicates, grouped facts, narrow projections, and distinct resolved Ticket IDs", async () => {
         const startAt = new Date("2026-09-01T17:00:00.000Z");
         const endAt = new Date("2026-09-25T17:00:00.000Z");
+        const previousStartAt = new Date("2026-08-08T17:00:00.000Z");
         const statusGroupBy = vi.fn().mockResolvedValue([
             { status: "OPEN", _count: { _all: 2 } },
         ]);
@@ -48,7 +49,14 @@ describe("IT Ticket analytics persistence", () => {
         const findCategories = vi.fn().mockResolvedValue([
             { id: 19, name: "หมวดประวัติ", key: "ARCHIVED", isActive: false },
         ]);
+        const queryRaw = vi.fn().mockResolvedValue([{
+            previousResolvedTickets: BigInt(3),
+            closedTickets: BigInt(1),
+            cancelledTickets: BigInt(2),
+            reopenedTickets: BigInt(0),
+        }]);
         const tx = {
+            $queryRaw: queryRaw,
             iTTicket: {
                 groupBy: vi.fn()
                     .mockImplementationOnce(statusGroupBy)
@@ -70,6 +78,7 @@ describe("IT Ticket analytics persistence", () => {
         const result = await readITAnalyticsPersistenceSnapshot(tx, {
             startAt,
             endAt,
+            previousStartAt,
             backlogStatuses: [
                 ITTicketStatus.OPEN,
                 ITTicketStatus.IN_PROGRESS,
@@ -127,8 +136,17 @@ describe("IT Ticket analytics persistence", () => {
             select: { id: true, name: true, key: true, isActive: true },
             orderBy: { id: "asc" },
         });
-        // No aging ranges requested: no extra unbounded counts.
-        expect(count).toHaveBeenCalledTimes(2);
+        expect(count).toHaveBeenCalledTimes(3);
+        expect(count).toHaveBeenCalledWith({ where: { createdAt: { gte: previousStartAt, lt: startAt } } });
+        expect(queryRaw).toHaveBeenCalledTimes(1);
+        expect(queryRaw.mock.calls[0]?.[0].sql).not.toContain("JOIN it_tickets");
+        expect(result).toMatchObject({
+            previousNewTicketCount: 1,
+            previousResolvedTicketCount: 3,
+            closedTicketCount: 1,
+            cancelledTicketCount: 2,
+            reopenedTicketCount: 0,
+        });
         expect(findMany).toHaveBeenCalledExactlyOnceWith({
             where: { createdAt: { gte: startAt, lt: endAt } },
             select: { createdAt: true },
@@ -156,15 +174,25 @@ describe("IT Ticket analytics persistence", () => {
     it("applies Ticket type/category scope to every Ticket aggregate and counts aging ranges on the backlog", async () => {
         const startAt = new Date("2026-09-01T17:00:00.000Z");
         const endAt = new Date("2026-09-25T17:00:00.000Z");
+        const previousStartAt = new Date("2026-08-08T17:00:00.000Z");
         const groupBy = vi.fn().mockResolvedValue([]);
         const count = vi.fn().mockResolvedValue(3);
         const aggregate = vi.fn().mockResolvedValue({ _min: { createdAt: null } });
         const findMany = vi.fn().mockResolvedValue([]);
         const eventGroupBy = vi.fn().mockResolvedValue([]);
         const findCategories = vi.fn().mockResolvedValue([]);
-        const queryRaw = vi.fn().mockResolvedValue([
-            { bucket: "0_1", count: BigInt(3) }, { bucket: "8_14", count: BigInt(3) }, { bucket: "15_PLUS", count: BigInt(3) },
-        ]);
+        const queryRaw = vi.fn()
+            .mockResolvedValueOnce([{
+                previousResolvedTickets: BigInt(0),
+                closedTickets: BigInt(0),
+                cancelledTickets: BigInt(0),
+                reopenedTickets: BigInt(1),
+            }])
+            .mockResolvedValueOnce([
+                { bucket: "0_1", count: BigInt(3) },
+                { bucket: "8_14", count: BigInt(3) },
+                { bucket: "15_PLUS", count: BigInt(3) },
+            ]);
         const tx = {
             $queryRaw: queryRaw,
             iTTicket: { groupBy, count, aggregate, findMany },
@@ -177,6 +205,7 @@ describe("IT Ticket analytics persistence", () => {
         const result = await readITAnalyticsPersistenceSnapshot(tx, {
             startAt,
             endAt,
+            previousStartAt,
             backlogStatuses: [ITTicketStatus.OPEN],
             resolutionEventKind: ITTicketEventKind.STATUS_CHANGED,
             resolutionStatus: ITTicketStatus.RESOLVED,
@@ -218,9 +247,17 @@ describe("IT Ticket analytics persistence", () => {
             orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         });
         expect(result.resolvedEvents).toEqual([]);
-        expect(count).toHaveBeenCalledTimes(2); // period and untriaged only
-        expect(queryRaw).toHaveBeenCalledTimes(1);
-        const statement = queryRaw.mock.calls[0]?.[0];
+        expect(count).toHaveBeenCalledTimes(3);
+        expect(count).toHaveBeenCalledWith({ where: { ...scope, createdAt: { gte: previousStartAt, lt: startAt } } });
+        expect(queryRaw).toHaveBeenCalledTimes(2);
+        const lifecycle = queryRaw.mock.calls[0]?.[0];
+        expect(lifecycle.sql).toContain("INNER JOIN it_tickets ON it_tickets.id = e.ticketId");
+        expect(lifecycle.sql).toContain("it_tickets.categoryId IS NULL");
+        expect(lifecycle.values).toEqual([
+            startAt, ITTicketEventKind.STATUS_CHANGED, previousStartAt, endAt,
+            startAt, ITTicketStatus.RESOLVED, startAt, ITTicketStatus.RESOLVED, "INCIDENT",
+        ]);
+        const statement = queryRaw.mock.calls[1]?.[0];
         expect(statement.sql).toContain("categoryId IS NULL");
         expect(statement.sql).toContain("GROUP BY bucket");
         expect(statement.values).toEqual([

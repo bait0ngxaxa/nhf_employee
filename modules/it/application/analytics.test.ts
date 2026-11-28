@@ -85,6 +85,11 @@ const populatedSnapshot: ITAnalyticsPersistenceSnapshot = {
         { departmentNameSnapshot: null, count: 1 },
     ],
     newTicketCount: 2,
+    previousNewTicketCount: 1,
+    previousResolvedTicketCount: 4,
+    closedTicketCount: 1,
+    cancelledTicketCount: 2,
+    reopenedTicketCount: 3,
     createdAtValues: [
         new Date("2026-09-25T16:59:59.000Z"),
         new Date("2026-09-25T17:00:00.000Z"),
@@ -154,6 +159,12 @@ describe("IT analytics application query", () => {
                 startAt: "2026-09-19T17:00:00.000Z",
                 endAt: now.toISOString(),
             },
+            previousPeriod: {
+                startAt: "2026-09-13T16:55:00.000Z",
+                endAt: "2026-09-19T17:00:00.000Z",
+                newTickets: { count: 1, percentageChange: 100 },
+                resolvedTickets: { count: 4, percentageChange: -50 },
+            },
             summary: {
                 currentBacklog: 3,
                 waitingRequester: 1,
@@ -164,6 +175,9 @@ describe("IT analytics application query", () => {
                 oldestUnresolvedAgeMinutes: 8225,
                 newTickets: 2,
                 resolvedTickets: 2,
+                closedTickets: 1,
+                cancelledTickets: 2,
+                reopenedTickets: 3,
             },
             typeDistribution: [
                 { type: "INCIDENT", count: 1 },
@@ -258,6 +272,31 @@ describe("IT analytics application query", () => {
         expect(result.departmentCreated).toEqual([
             { label: "ฝ่ายเดียวกัน", count: 5 },
         ]);
+    });
+
+    it("uses historical department names and keeps missing and tied department shares reconcilable", async () => {
+        const longName = "สำนักงานส่งเสริมระบบสุขภาพและการมีส่วนร่วมของชุมชน";
+        useSnapshot({
+            ...populatedSnapshot,
+            newTicketCount: 8,
+            departmentSnapshots: [
+                { departmentNameSnapshot: longName, count: 2 },
+                { departmentNameSnapshot: " ฝ่าย ก ", count: 1 },
+                { departmentNameSnapshot: "ฝ่าย ก", count: 1 },
+                { departmentNameSnapshot: "ฝ่าย ข", count: 2 },
+                { departmentNameSnapshot: null, count: 1 },
+                { departmentNameSnapshot: "  ", count: 1 },
+            ],
+        });
+        const report = await getITAnalyticsDashboard(actor, "7D", now);
+
+        expect(report.departmentCreated).toEqual([
+            { label: "ฝ่าย ก", count: 2 },
+            { label: "ฝ่าย ข", count: 2 },
+            { label: longName, count: 2 },
+            { label: "ไม่ระบุหน่วยงาน", count: 2 },
+        ]);
+        expect(report.departmentCreated.reduce((sum, { count }) => sum + count, 0)).toBe(report.summary.newTickets);
     });
 
     it("preserves distinct active assignee identities when display names collide", async () => {
@@ -391,6 +430,11 @@ describe("IT analytics application query", () => {
             untriagedBacklogCount: 0,
             departmentSnapshots: [],
             newTicketCount: 0,
+            previousNewTicketCount: 0,
+            previousResolvedTicketCount: 0,
+            closedTicketCount: 0,
+            cancelledTicketCount: 0,
+            reopenedTicketCount: 0,
             createdAtValues: [],
             resolvedEvents: [],
             createdCategories: [],
@@ -410,7 +454,12 @@ describe("IT analytics application query", () => {
             oldestUnresolvedAgeMinutes: null,
             newTickets: 0,
             resolvedTickets: 0,
+            closedTickets: 0,
+            cancelledTickets: 0,
+            reopenedTickets: 0,
         });
+        expect(result.previousPeriod.newTickets).toEqual({ count: 0, percentageChange: 0 });
+        expect(result.previousPeriod.resolvedTickets).toEqual({ count: 0, percentageChange: 0 });
         expect(result.trend).toHaveLength(7);
         expect(result.trend.every((day) => day.created === 0 && day.resolved === 0)).toBe(true);
         expect(result.statusDistribution.every((row) => row.count === 0)).toBe(true);
@@ -446,6 +495,29 @@ describe("IT analytics application query", () => {
         expect(result.filterOptions.categories).toEqual([]);
     });
 
+    it.each([
+        [0, 0, 0],
+        [2, 0, null],
+        [0, 2, -100],
+        [3, 2, 50],
+        [1, 2, -50],
+        [2, 2, 0],
+    ])("compares %i current and %i previous Tickets as %s", async (current, previous, percentageChange) => {
+        useSnapshot({
+            ...populatedSnapshot,
+            newTicketCount: current,
+            previousNewTicketCount: previous,
+            previousResolvedTicketCount: previous,
+            resolvedEvents: Array.from({ length: current }, (_, index) => ({ ticketId: index + 1, occurredAt: now })),
+        });
+
+        const result = await getITAnalyticsDashboard(actor, "7D", now);
+
+        const comparison = { count: previous, percentageChange };
+        expect(result.previousPeriod.newTickets).toEqual(comparison);
+        expect(result.previousPeriod.resolvedTickets).toEqual(comparison);
+    });
+
     it("passes validated Ticket filters and one shared aging clock to every persistence read", async () => {
         const result = await getITAnalyticsDashboard(actor, {
             period: "7D",
@@ -457,6 +529,7 @@ describe("IT analytics application query", () => {
         expect(window).toMatchObject({
             startAt: new Date("2026-09-19T17:00:00.000Z"),
             endAt: now,
+            previousStartAt: new Date("2026-09-13T16:55:00.000Z"),
             scope: { type: "INCIDENT", category: 19 },
         });
         expect(window?.backlogAgeRanges).toHaveLength(5);

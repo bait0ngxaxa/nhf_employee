@@ -109,6 +109,11 @@ export interface ITPresentationCapabilities {
     readonly canReadAnalytics: boolean;
 }
 
+export interface ITAnalyticsCountComparison {
+    readonly count: number;
+    readonly percentageChange: number | null;
+}
+
 export interface ITAnalyticsDashboard {
     readonly generatedAt: string;
     readonly timeZone: typeof IT_ANALYTICS_TIME_ZONE;
@@ -116,6 +121,13 @@ export interface ITAnalyticsDashboard {
         readonly key: ITAnalyticsPeriod;
         readonly startAt: string;
         readonly endAt: string;
+    };
+    /** Adjacent window of equal elapsed length, with the same Ticket filters. */
+    readonly previousPeriod: {
+        readonly startAt: string;
+        readonly endAt: string;
+        readonly newTickets: ITAnalyticsCountComparison;
+        readonly resolvedTickets: ITAnalyticsCountComparison;
     };
     /** Applied Ticket filters; they narrow both period and current-snapshot metrics. */
     readonly filters: {
@@ -143,6 +155,10 @@ export interface ITAnalyticsDashboard {
         readonly oldestUnresolvedAgeMinutes: number | null;
         readonly newTickets: number;
         readonly resolvedTickets: number;
+        /** Distinct Tickets per transition in the period. Cohorts can overlap. */
+        readonly closedTickets: number;
+        readonly cancelledTickets: number;
+        readonly reopenedTickets: number;
     };
     readonly trend: readonly {
         readonly date: string;

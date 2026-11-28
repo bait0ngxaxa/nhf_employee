@@ -1,4 +1,4 @@
-import { Role, type ITTicketPriority } from "@prisma/client";
+import { Role, type ITTicketPriority, type ITTicketStatus } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -244,8 +244,8 @@ async function createTicket(input: TicketInput): Promise<number> {
 async function createStatusEvent(
     ticketId: number,
     actorUserId: number,
-    fromStatus: "IN_PROGRESS" | "RESOLVED",
-    toStatus: "IN_PROGRESS" | "RESOLVED",
+    fromStatus: ITTicketStatus,
+    toStatus: ITTicketStatus,
     occurredAt: Date,
 ): Promise<void> {
     await prisma.iTTicketEvent.create({
@@ -452,6 +452,9 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             ),
             newTickets: 6,
             resolvedTickets: 2,
+            closedTickets: 0,
+            cancelledTickets: 1,
+            reopenedTickets: 0,
         });
         expect(dashboard.backlogAging).toEqual([
             { bucket: "0_1", count: 3 },
@@ -832,7 +835,7 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
             data: { key: nextFixtureKey("historical-category"), name: "หมวดหมู่ย้อนหลัง", isActive: false },
         });
         trackedCategoryIds.add(category.id);
-        const createdAt = new Date("2026-08-01T17:00:00.000Z");
+        const createdAt = new Date("2026-07-01T17:00:00.000Z");
         const start7 = new Date("2026-09-19T17:00:00.000Z");
         const start30 = new Date("2026-08-27T17:00:00.000Z");
         const reopened = await createTicket({
@@ -874,6 +877,88 @@ describe.sequential("IT7 Ticket analytics with real MySQL", () => {
         await expect(getITAnalyticsDashboard(viewer.context, { ...scope, period: "7D" }, NOW)).resolves.toEqual(weekly);
         await expect(getITAnalyticsDashboard(viewer.context, { ...scope, period: "30D" }, NOW)).resolves.toEqual(monthly);
         await expect(getITAnalyticsDashboard(viewer.context, { ...uncategorizedScope, period: "7D" }, NOW)).resolves.toEqual(zero);
+    });
+
+    it("counts distinct lifecycle transitions and comparisons at both boundaries under the same Ticket filters", async () => {
+        const departmentId = await createDepartment("reporting-boundaries");
+        const viewer = await createWorkforceUser("reporting-boundaries", departmentId);
+        await grant(viewer.userId, "it.analytics.read");
+        const category = await prisma.iTTicketCategory.create({
+            data: { key: nextFixtureKey("reporting-category"), name: "หมวดรายงาน" },
+        });
+        trackedCategoryIds.add(category.id);
+        const previousStart = new Date("2026-09-13T16:55:00.000Z");
+        const currentStart = new Date("2026-09-19T17:00:00.000Z");
+        const beforeBoth = new Date(+previousStart - 1);
+        const beforeCurrent = new Date(+currentStart - 1);
+        const inside = new Date(+currentStart + 1000);
+        const selected = { requester: viewer, type: "INCIDENT", categoryId: category.id } as const;
+        const reopened = await createTicket({ ...selected, status: "IN_PROGRESS", priority: "P1", createdAt: beforeBoth });
+        const closed = await createTicket({ ...selected, status: "CLOSED", createdAt: previousStart });
+        const cancelled = await createTicket({ ...selected, status: "CANCELLED", createdAt: currentStart });
+        const ordinary = await createTicket({ ...selected, status: "IN_PROGRESS", createdAt: beforeBoth });
+        const excludedType = await createTicket({ ...selected, type: "SERVICE_REQUEST", status: "CLOSED", createdAt: previousStart });
+        const excludedCategory = await createTicket({ ...selected, categoryId: null, status: "CLOSED", createdAt: previousStart });
+        const outside = await createTicket({ ...selected, status: "CANCELLED", createdAt: beforeBoth });
+
+        await createResolvedEvent(reopened, viewer.userId, previousStart);
+        await createResolvedEvent(reopened, viewer.userId, beforeCurrent);
+        await createResolvedEvent(reopened, viewer.userId, currentStart);
+        await createResolvedEvent(reopened, viewer.userId, new Date(+inside + 2000));
+        await createStatusEvent(reopened, viewer.userId, "RESOLVED", "IN_PROGRESS", inside);
+        await createStatusEvent(reopened, viewer.userId, "RESOLVED", "IN_PROGRESS", new Date(+inside + 3000));
+        await createResolvedEvent(closed, viewer.userId, beforeCurrent);
+        await createStatusEvent(closed, viewer.userId, "RESOLVED", "CLOSED", inside);
+        await createStatusEvent(cancelled, viewer.userId, "OPEN", "CANCELLED", currentStart);
+        await createStatusEvent(ordinary, viewer.userId, "WAITING_REQUESTER", "IN_PROGRESS", inside);
+        await prisma.iTTicketEvent.create({
+            data: {
+                ticketId: ordinary, actorUserId: viewer.userId, kind: "CATEGORY_CHANGED",
+                fromStatus: "RESOLVED", toStatus: "IN_PROGRESS", occurredAt: inside,
+            },
+        });
+        await createResolvedEvent(outside, viewer.userId, beforeBoth);
+        await createStatusEvent(outside, viewer.userId, "RESOLVED", "CLOSED", beforeCurrent);
+        await createStatusEvent(outside, viewer.userId, "OPEN", "CANCELLED", NOW);
+        for (const ticketId of [excludedType, excludedCategory]) {
+            await createResolvedEvent(ticketId, viewer.userId, beforeCurrent);
+            await createStatusEvent(ticketId, viewer.userId, "RESOLVED", "CLOSED", inside);
+        }
+
+        const filters = { type: "INCIDENT", category: String(category.id) };
+        const weekly = await getITAnalyticsDashboard(viewer.context, { ...filters, period: "7D" }, NOW);
+
+        expect(weekly.summary).toMatchObject({
+            newTickets: 1, resolvedTickets: 1, closedTickets: 1, cancelledTickets: 1, reopenedTickets: 1,
+            currentBacklog: 2, highPriorityBacklog: 1, unassignedBacklog: 2, untriagedBacklog: 2, agedBacklog: 2,
+        });
+        expect(weekly.previousPeriod).toEqual({
+            startAt: previousStart.toISOString(),
+            endAt: currentStart.toISOString(),
+            newTickets: { count: 1, percentageChange: 0 },
+            resolvedTickets: { count: 2, percentageChange: -50 },
+        });
+        expect(weekly.trend[0]).toEqual({ date: "2026-09-20", created: 1, resolved: 1 });
+        expect(weekly.trend.reduce((sum, row) => sum + row.resolved, 0)).toBe(1);
+        const activeStatuses = weekly.statusDistribution.filter(({ status }) =>
+            status === "OPEN" || status === "IN_PROGRESS" || status === "WAITING_REQUESTER");
+        for (const rows of [activeStatuses, weekly.priorityBacklog, weekly.backlogAging, weekly.assigneeBacklog]) {
+            expect(rows.reduce((sum, { count }) => sum + count, 0)).toBe(weekly.summary.currentBacklog);
+        }
+
+        const monthly = await getITAnalyticsDashboard(viewer.context, { ...filters, period: "30D" }, NOW);
+        expect(monthly.summary.currentBacklog).toBe(weekly.summary.currentBacklog);
+        expect(monthly.backlogAging).toEqual(weekly.backlogAging);
+        for (const partialFilters of [{ type: filters.type }, { category: filters.category }]) {
+            const report = await getITAnalyticsDashboard(viewer.context, { ...partialFilters, period: "7D" }, NOW);
+            expect(report.previousPeriod.newTickets.count).toBe(2);
+            expect(report.previousPeriod.resolvedTickets.count).toBe(3);
+            expect(report.summary.closedTickets).toBe(2);
+        }
+        const unfiltered = await getITAnalyticsDashboard(viewer.context, "7D", NOW);
+        expect(unfiltered.previousPeriod.newTickets.count).toBe(3);
+        expect(unfiltered.previousPeriod.resolvedTickets.count).toBe(4);
+        expect(unfiltered.summary.closedTickets).toBe(3);
     });
 
     it("keeps a whole Dashboard snapshot while another transaction commits Ticket and event changes", async () => {

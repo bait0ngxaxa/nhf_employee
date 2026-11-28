@@ -1,6 +1,6 @@
 # IT analytics chart browser smoke test
 
-Run `npm run test:it-analytics:browser` after installing the locked development dependencies. The script uses the existing esbuild, PostCSS/Tailwind and Puppeteer toolchain to render the actual chart component with project styles and deterministic fixture data. It does not start Next.js, fetch analytics, or access a database.
+Run `npm run test:it-analytics:browser` with esbuild, PostCSS/Tailwind and Puppeteer available. Set `PUPPETEER_MODULE` to the entry point of an external Puppeteer installation and `CHART_BROWSER_PATH` to the installed Chrome or Chromium executable when using the browser tooling outside the repository. The script renders the actual chart component with project styles and deterministic fixture data. It does not start Next.js, fetch analytics, or access a database.
 
 Puppeteer uses its installed browser by default. To use an existing Chromium browser, set `CHART_BROWSER_PATH` to its executable. For example, in PowerShell:
 

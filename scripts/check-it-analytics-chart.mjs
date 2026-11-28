@@ -6,7 +6,9 @@ import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
 import postcss from "postcss";
 import tailwind from "@tailwindcss/postcss";
-import puppeteer from "puppeteer";
+const { default: puppeteer } = await import(process.env.PUPPETEER_MODULE
+    ? pathToFileURL(resolve(process.env.PUPPETEER_MODULE)).href
+    : "puppeteer");
 
 // Render the real component and project CSS, without starting Next or connecting to an API.
 // esbuild/PostCSS/Puppeteer are already installed by the locked development toolchain.
@@ -27,12 +29,22 @@ const bundle = await build({
         resolveDir: process.cwd(), loader: "tsx",
     },
     bundle: true, write: false, jsx: "automatic",
+    define: { "process.env.NODE_ENV": "\"production\"" },
+    plugins: [{
+        name: "next-link-shim",
+        setup(context) {
+            // The shared chart panels import Link. This standalone fixture runs outside Next.
+            context.onResolve({ filter: /^next\/link$/ }, () => ({ path: "link", namespace: "next-link-shim" }));
+            context.onLoad({ filter: /.*/, namespace: "next-link-shim" }, () => ({ contents: 'export default "a";' }));
+        },
+    }],
 });
 const css = await postcss([tailwind()]).process(await readFile("app/globals.css", "utf8"), {
     from: resolve("app/globals.css"),
 });
 await writeFile(join(output, "chart.js"), bundle.outputFiles[0].contents);
 await writeFile(join(output, "index.html"), `<!doctype html><html lang="th"><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>${css.css}</style><body><div id="root"></div><script src="chart.js"></script></body></html>`, "utf8");
 
 const browser = await puppeteer.launch({
